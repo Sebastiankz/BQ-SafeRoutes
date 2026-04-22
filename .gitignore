@@ -1,0 +1,46 @@
+# ── Entorno ────────────────────────────────────────
+.env
+*.env.local
+
+# ── Python / Backend ──────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# ── Node / Frontend ───────────────────────────────
+node_modules/
+.expo/
+dist/
+.next/
+*.tsbuildinfo
+
+# ── IDE ───────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────
+# No ignorar docker-compose ni Dockerfiles
+
+# ── ML / Datos ────────────────────────────────────
+ml/data/*.csv
+ml/data/*.xlsx
+ml/data/*.json
+*.pkl
+*.joblib
+.ipynb_checkpoints/
+
+# ── Secretos ──────────────────────────────────────
+firebase-credentials.json
+*.pem
+*.key
