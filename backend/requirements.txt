@@ -1,0 +1,29 @@
+# ── Web framework ─────────────────────────────────
+fastapi
+uvicorn[standard]
+
+# ── Base de datos ─────────────────────────────────
+sqlalchemy[asyncio]
+asyncpg
+geoalchemy2
+alembic
+
+# ── Validación / Schemas ─────────────────────────
+pydantic[email]
+pydantic-settings
+
+# ── Cache ─────────────────────────────────────────
+redis
+
+# ── ML (se usará desde semana 2) ─────────────────
+scikit-learn
+geopandas
+shapely
+
+# ── Auth (semana 4) ──────────────────────────────
+python-jose[cryptography]
+passlib[bcrypt]
+
+# ── Utilidades ────────────────────────────────────
+python-multipart
+httpx

@@ -1,0 +1,131 @@
+# Cada entrada bajo "services" es un contenedor independiente.
+# Docker los conecta en una red interna: se hablan por nombre (db, redis, backend).
+services:
+
+  # ── BASE DE DATOS ────────────────────────────────────────────────────────────
+  db:
+    # Imagen oficial de PostgreSQL 16 con la extensión PostGIS ya incluida.
+    # PostGIS permite guardar y consultar coordenadas GPS directamente en SQL.
+    image: postgis/postgis:16-3.4
+
+    # Nombre visible en Docker Desktop y en los logs.
+    container_name: saferoutes-db
+
+    # Si el contenedor se cae solo (error), Docker lo reinicia automáticamente.
+    # "unless-stopped" significa: reinicia siempre, excepto si lo detuviste tú a propósito.
+    restart: unless-stopped
+
+    # Variables de entorno: configuran el usuario, contraseña y nombre de la BD.
+    # Sintaxis ${VAR:-default}: lee la variable del archivo .env;
+    # si no existe el .env o la variable está vacía, usa el valor tras ":-".
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-saferoutes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saferoutes_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-saferoutes}
+
+    # Expone el puerto de PostgreSQL hacia tu Mac.
+    # Formato: "puerto_en_tu_mac:puerto_dentro_del_contenedor"
+    # Así puedes conectarte con DBeaver, TablePlus, etc. desde fuera de Docker.
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+    volumes:
+      # Volumen nombrado: los datos de la BD se guardan aquí.
+      # Si eliminas el contenedor pero NO el volumen, los datos sobreviven.
+      # Si haces "docker compose down -v", pierdes todo.
+      - pgdata:/var/lib/postgresql/data
+
+      # Monta el archivo SQL local dentro del contenedor en una carpeta especial.
+      # PostgreSQL ejecuta automáticamente todo lo que encuentre ahí la primera vez
+      # que arranca con una BD vacía: crea tablas, índices, datos de ejemplo.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+
+    # Comprobación de salud: Docker pregunta cada 5 segundos si la BD está lista.
+    # "pg_isready" devuelve OK cuando PostgreSQL acepta conexiones.
+    # Otros servicios usan este estado para saber cuándo pueden arrancar.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-saferoutes}"]
+      interval: 5s   # cada cuánto comprueba
+      timeout: 5s    # cuánto espera la respuesta antes de contar como fallo
+      retries: 5     # cuántos fallos consecutivos antes de marcar el servicio como "unhealthy"
+
+  # ── CACHÉ ────────────────────────────────────────────────────────────────────
+  redis:
+    # Redis es una base de datos en memoria (ultra rápida).
+    # Se usa para guardar sesiones de usuario, resultados temporales,
+    # o como cola de tareas, sin tener que ir a PostgreSQL cada vez.
+    # "alpine" = imagen mínima de Linux (~30 MB vs ~300 MB de la normal).
+    image: redis:7-alpine
+
+    container_name: saferoutes-redis
+    restart: unless-stopped
+
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+    volumes:
+      # Persiste los datos de Redis en un volumen (opcional para caché,
+      # pero útil si se usa como cola de tareas).
+      - redisdata:/data
+
+    healthcheck:
+      # "redis-cli ping" devuelve "PONG" si Redis está vivo.
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── BACKEND ──────────────────────────────────────────────────────────────────
+  backend:
+    # A diferencia de db y redis, esta imagen NO viene de Docker Hub.
+    # Docker la construye desde el Dockerfile que está en ./backend/.
+    build:
+      context: ./backend      # carpeta donde está el Dockerfile
+      dockerfile: Dockerfile  # nombre del archivo (por si hubiera varios)
+
+    container_name: saferoutes-backend
+    restart: unless-stopped
+
+    environment:
+      # URL completa de conexión a la BD.
+      # Nota: la dirección es "db" (nombre del servicio), no "localhost".
+      # Dentro de la red Docker, los servicios se encuentran por su nombre.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-saferoutes}:${POSTGRES_PASSWORD:-saferoutes_dev}@db:5432/${POSTGRES_DB:-saferoutes}
+
+      # URL de conexión a Redis, igual: por nombre de servicio.
+      REDIS_URL: redis://redis:6379/0
+
+      # Clave secreta para firmar tokens JWT de autenticación.
+      # En producción debe ser una cadena larga y aleatoria.
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+
+      # Permite al código saber si está en desarrollo o producción
+      # (por ejemplo, para mostrar más logs o desactivar el modo debug).
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+    # El backend escucha en el puerto 8000 dentro del contenedor.
+    # Lo mapeamos al mismo puerto en tu Mac → http://localhost:8000
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+    volumes:
+      # Monta tu carpeta local de código dentro del contenedor.
+      # Efecto: cuando guardas un .py en tu editor, Uvicorn lo detecta
+      # y recarga el servidor automáticamente (hot reload).
+      # Sin esto tendrías que reconstruir la imagen en cada cambio.
+      - ./backend/app:/app/app
+
+    # El backend NO arranca hasta que db y redis estén "healthy".
+    # Sin esto, FastAPI intentaría conectarse a la BD antes de que existiera y fallaría.
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+# ── VOLÚMENES NOMBRADOS ───────────────────────────────────────────────────────
+# Docker gestiona estos volúmenes fuera de tu sistema de archivos normal.
+# Sobreviven a "docker compose down" pero se eliminan con "docker compose down -v".
+volumes:
+  pgdata:     # datos de PostgreSQL
+  redisdata:  # datos de Redis
