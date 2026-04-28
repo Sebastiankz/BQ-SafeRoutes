@@ -44,3 +44,6 @@ ml/data/*.json
 firebase-credentials.json
 *.pem
 *.key
+
+# ── Otros ─────────────────────────────────────────
+/aspectos_proyectos.md
