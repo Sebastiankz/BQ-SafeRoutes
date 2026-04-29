@@ -123,6 +123,30 @@ services:
       redis:
         condition: service_healthy
 
+  # ── WEB DASHBOARD ────────────────────────────────────────────────────────────
+  # Frontend Vite + TypeScript compilado a estáticos y servido por nginx.
+  # Imagen multi-stage: Node compila, nginx sirve. Resultado final ~25 MB.
+  web-dashboard:
+    build:
+      context: ./web-dashboard
+      dockerfile: Dockerfile
+
+    container_name: saferoutes-web
+
+    restart: unless-stopped
+
+    # nginx escucha en el puerto 80 dentro del contenedor.
+    # Lo exponemos en el 5173 de tu Mac (puerto típico de Vite en dev)
+    # para no chocar con otros servicios web locales.
+    ports:
+      - "${WEB_PORT:-5173}:80"
+
+    # Espera a que el backend esté arriba: el dashboard hace proxy /api → backend.
+    # Si el backend aún no escucha, nginx devolvería 502 al cargar datos.
+    depends_on:
+      backend:
+        condition: service_started
+
 # ── VOLÚMENES NOMBRADOS ───────────────────────────────────────────────────────
 # Docker gestiona estos volúmenes fuera de tu sistema de archivos normal.
 # Sobreviven a "docker compose down" pero se eliminan con "docker compose down -v".
