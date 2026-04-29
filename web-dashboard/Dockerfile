@@ -33,6 +33,6 @@ EXPOSE 80
 
 # Healthcheck: nginx responde 200 en "/" cuando el sitio está servido.
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1
+    CMD wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
