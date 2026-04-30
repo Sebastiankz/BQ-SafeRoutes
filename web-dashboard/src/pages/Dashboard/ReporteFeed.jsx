@@ -1,5 +1,6 @@
 // src/pages/Dashboard/ReporteFeed.jsx
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, MapPin, Clock, AlertTriangle, Zap, Navigation, Timer } from 'lucide-react';
 // ── Data simulada de 10 reportes ciudadanos ──────────────────
 const REPORTES = [
@@ -30,11 +31,10 @@ const PRIORIDAD_COLOR = {
 
 // ── Modal de detalle ─────────────────────────────────────────
 function ReporteModal({ reporte, onClose }) {
-  return (
-    // Overlay: cubre toda la pantalla
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}  // clic fuera del modal lo cierra
+      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
     >
       {/* Tarjeta del modal — stopPropagation evita cerrar al hacer clic adentro */}
       <div
@@ -89,7 +89,8 @@ function ReporteModal({ reporte, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
