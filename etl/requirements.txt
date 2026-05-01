@@ -1,0 +1,16 @@
+# ── Manipulación de datos ────────────────────────────────────────────
+pandas==2.2.3          # Leer el CSV, limpiar columnas, operar sobre filas como si fuera Excel pero en código
+
+# ── Base de datos ────────────────────────────────────────────────────
+psycopg[binary]==3.2.6  # Conector sincrónico PostgreSQL (psycopg v3). Wheels pre-compilados compatibles con Python 3.13.
+                        # SQLAlchemy 2.x lo soporta con el dialecto "postgresql+psycopg://"
+sqlalchemy==2.0.30     # ORM / query builder. Nos da una conexión tipada y manejo de transacciones.
+geoalchemy2==0.15.1    # Extiende SQLAlchemy para entender tipos PostGIS (GEOMETRY, ST_MakePoint, etc.)
+shapely==2.0.6         # Crear objetos geométricos (Point) en Python antes de mandarlos a la BD
+
+# ── Geocodificación ──────────────────────────────────────────────────
+googlemaps==4.10.0     # SDK oficial de Google Maps. Envuelve la Geocoding API con reintentos automáticos.
+
+# ── Utilidades ───────────────────────────────────────────────────────
+python-dotenv==1.0.1   # Leer variables de entorno desde un archivo .env (API keys, DATABASE_URL)
+tqdm==4.66.4           # Barra de progreso en la terminal — indispensable para no adivinar cuánto falta

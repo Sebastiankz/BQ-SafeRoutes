@@ -1,19 +1,28 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+import os
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.config import get_settings
+load_dotenv()
 
-settings = get_settings()
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL no está definida en el archivo .env")
 
-engine = create_async_engine(settings.database_url, echo=(settings.environment == "development"))
+# Motor de SQLAlchemy (flujo sincronico para endpoints actuales)
+engine = create_engine(DATABASE_URL)
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+# Sesión por request en FastAPI
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base para modelos ORM
+Base = declarative_base()
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-async def get_db() -> AsyncSession:
-    async with async_session() as session:
-        yield session
+def get_db():
+    # Dependency de FastAPI: abre/cierra una sesion por request.
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

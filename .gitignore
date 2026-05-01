@@ -1,6 +1,7 @@
 # ── Entorno ────────────────────────────────────────
 .env
 *.env.local
+.venv/
 
 # ── Python / Backend ──────────────────────────────
 __pycache__/
@@ -40,10 +41,18 @@ ml/data/*.json
 *.joblib
 .ipynb_checkpoints/
 
+# ── ETL ───────────────────────────────────────────
+etl/data/geocache.json      # cache de geocodificación (puede tener 3000+ entradas)
+etl/data/geocoding_failures.log
+etl/data/etl.log
+etl/.venv/
+
 # ── Secretos ──────────────────────────────────────
 firebase-credentials.json
 *.pem
 *.key
 
 # ── Otros ─────────────────────────────────────────
-/aspectos_proyectos.md
+*.md
+!README.md
+
