@@ -6,6 +6,7 @@ from .database import engine, Base, get_db
 from . import models  # noqa: F401  # registra modelos para create_all
 from .routers import reportes_router, usuarios_router, hotspots_router
 
+# Crea tablas faltantes al iniciar (MVP). Para produccion, usar migraciones.
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SafeRoutes BQ API")

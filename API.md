@@ -1,8 +1,8 @@
 # SafeRoutes BQ — Contrato de API v0.1
 
-> **Estado:** Borrador  
+> **Estado:** Implementado parcialmente (MVP backend en progreso)  
 > **Firmado por:** Pendiente (Persona A, Persona B, Persona C)  
-> **Última actualización:** 2026-04-21
+> **Última actualización:** 2026-05-01
 
 ---
 
@@ -50,6 +50,8 @@ Documentación Swagger automática en: `http://localhost:8000/docs`
 #### POST `/reportes/`
 Crea un nuevo reporte ciudadano.
 
+**Estado actual:** Implementado.
+
 **Request Body:**
 ```json
 {
@@ -78,8 +80,14 @@ Crea un nuevo reporte ciudadano.
 }
 ```
 
+**Notas de implementación actual:**
+- `usuario_id` se asigna temporalmente como `1` hasta implementar JWT.
+- El campo geográfico se guarda en PostGIS con `ST_SetSRID(ST_MakePoint(longitud, latitud), 4326)`.
+
 #### GET `/reportes/`
 Lista reportes con paginación.
+
+**Estado actual:** Implementado.
 
 **Query Params:**
 - `limit` (int, default=50, max=200)
@@ -90,6 +98,8 @@ Lista reportes con paginación.
 #### GET `/reportes/{reporte_id}`
 Obtiene un reporte por ID.
 
+**Estado actual:** Implementado.
+
 **Response 200:** Objeto reporte.  
 **Response 404:** `{"detail": "Reporte no encontrado"}`
 
@@ -99,6 +109,8 @@ Obtiene un reporte por ID.
 
 #### GET `/hotspots/`
 Lista hotspots activos.
+
+**Estado actual:** Implementado.
 
 **Query Params:**
 - `activo` (bool, default=true)
@@ -128,6 +140,8 @@ Lista hotspots activos.
 #### POST `/usuarios/`
 Registra un nuevo usuario.
 
+**Estado actual:** Implementado.
+
 **Request Body:**
 ```json
 {
@@ -140,8 +154,14 @@ Registra un nuevo usuario.
 **Response 201:** Objeto usuario (sin password).  
 **Response 400:** `{"detail": "Email ya registrado"}`
 
+**Notas de implementación actual:**
+- `password` se almacena como `hashed_password` usando SHA-256 (temporal para MVP).
+- Recomendación de hardening posterior: migrar a `bcrypt` o `argon2`.
+
 #### GET `/usuarios/{usuario_id}`
 Obtiene un usuario por ID.
+
+**Estado actual:** Implementado.
 
 **Response 200:** Objeto usuario.  
 **Response 404:** `{"detail": "Usuario no encontrado"}`
@@ -158,6 +178,8 @@ Obtiene un usuario por ID.
 | GET    | `/reportes/recientes`    | 4      | Últimos reportes para el dashboard   |
 | POST   | `/reportes/{id}/validar` | 3      | Validación comunitaria de un reporte |
 | POST   | `/hotspots/recalcular`   | 3      | Dispara recálculo de DBSCAN          |
+
+> Nota: `POST /hotspots/` aún no está implementado en la API actual.
 
 ---
 
@@ -209,3 +231,4 @@ Obtiene un usuario por ID.
 - **Paginación:** Offset-based con `limit` y `offset`.
 - **Autenticación:** JWT Bearer token (semana 4). Hasta entonces, se usa `usuario_id=1` hardcodeado.
 - **Formato de fechas:** ISO 8601 con timezone.
+- **Manejo de credenciales:** `DATABASE_URL` se lee desde `.env` y no debe versionarse en Git.
