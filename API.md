@@ -20,17 +20,28 @@ Documentación Swagger automática en: `http://localhost:8000/docs`
 
 ### 1. Health Check
 
-| Método | Ruta      | Descripción              |
-|--------|-----------|--------------------------|
-| GET    | `/health` | Verifica que la API esté activa |
+| Método | Ruta          | Descripción                                  |
+|--------|---------------|----------------------------------------------|
+| GET    | `/health`     | Verifica que la API esté activa              |
+| GET    | `/health/db`  | Verifica conexión a PostgreSQL (`DATABASE_URL`) |
 
-**Response 200:**
+**Response 200 (`/health`):**
 ```json
 {
   "status": "ok",
   "service": "SafeRoutes BQ API"
 }
 ```
+
+**Response 200 (`/health/db`):**
+```json
+{
+  "status": "ok",
+  "database": "reachable"
+}
+```
+
+**Response 503 (`/health/db`):** BD inalcanzable o credenciales/URL incorrectas (`detail` con mensaje del driver).
 
 ---
 
@@ -192,7 +203,9 @@ Obtiene un usuario por ID.
 
 ## Notas técnicas
 
-- **Coordenadas:** SRID 4326 (WGS 84). Latitud primero, longitud segundo en JSON. En PostGIS, longitud primero (ST_MakePoint(lon, lat)).
+- **Base de datos:** PostgreSQL en **Supabase** con extensión **PostGIS**. La cadena de conexión del backend usa la URL que proporciona Supabase (variable de entorno `DATABASE_URL` / equivalente en FastAPI).
+- **Ubicaciones:** no se expone geocodificación en la API como fuente de verdad; se trabaja con **coordenadas** (misma convención que el ETL y `etl/data/geocache.json`: objetos con **`lat`** y **`lng`** en decimal). Las direcciones en texto, si existen en CSV u otros orígenes, son **solo referencia/auditoría** frente al punto geográfico almacenado.
+- **Coordenadas:** SRID 4326 (WGS 84). En JSON del API se envían **`latitud`/`longitud`** según los endpoints actuales, en línea con **lat/lng** decimal (equivalente semántico a `lat`/`lng` del geocache). En PostGIS: **longitud primero** — `ST_MakePoint(longitud, latitud)` con SRID 4326.
 - **Paginación:** Offset-based con `limit` y `offset`.
 - **Autenticación:** JWT Bearer token (semana 4). Hasta entonces, se usa `usuario_id=1` hardcodeado.
 - **Formato de fechas:** ISO 8601 con timezone.

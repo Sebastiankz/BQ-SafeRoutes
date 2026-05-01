@@ -1,6 +1,7 @@
 # ── Entorno ────────────────────────────────────────
 .env
 *.env.local
+.venv/
 
 # ── Python / Backend ──────────────────────────────
 __pycache__/
@@ -54,3 +55,4 @@ firebase-credentials.json
 # ── Otros ─────────────────────────────────────────
 *.md
 !README.md
+
