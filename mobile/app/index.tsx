@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View, Text, ActivityIndicator } from "react-native";
-import MapView, { PROVIDER_GOOGLE} from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+//import MapView, { PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
 
 //coordenadas del centro de BQ como fallback
@@ -66,7 +67,8 @@ return (
       <MapView
         ref={mapRef}
         style={styles.mapa}
-        provider={PROVIDER_GOOGLE}
+        provider={PROVIDER_GOOGLE}  
+        //provider={PROVIDER_DEFAULT}
         initialRegion={region}
         showsUserLocation={true}       // punto azul con la posición del usuario
         showsMyLocationButton={true}   // botón para re-centrar en el usuario
