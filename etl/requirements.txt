@@ -2,7 +2,7 @@
 pandas==2.2.3          # Leer el CSV, limpiar columnas, operar sobre filas como si fuera Excel pero en código
 
 # ── Base de datos ────────────────────────────────────────────────────
-psycopg[binary]==3.2.6  # Conector sincrónico PostgreSQL (psycopg v3). Wheels pre-compilados compatibles con Python 3.13.
+psycopg2-binary==2.9.9
                         # SQLAlchemy 2.x lo soporta con el dialecto "postgresql+psycopg://"
 sqlalchemy==2.0.30     # ORM / query builder. Nos da una conexión tipada y manejo de transacciones.
 geoalchemy2==0.15.1    # Extiende SQLAlchemy para entender tipos PostGIS (GEOMETRY, ST_MakePoint, etc.)

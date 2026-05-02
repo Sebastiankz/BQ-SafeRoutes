@@ -13,6 +13,11 @@ import googlemaps         # SDK oficial de Google Maps
 from dotenv import load_dotenv # cargar desde .env
 from tqdm import tqdm # barra de progreso
 
+import psycopg2 # para conexion a PostgreSQL
+from psycopg2.extras import execute_values # para inserciones masivas 
+from datetime import datetime 
+
+
 BASE_DIR = Path(__file__).resolve().parent
 
 GEOCACHE_PATH = BASE_DIR / "data" / "geocache.json" # cache de geocodificacion para no hacer consultas repetidas a la API
@@ -136,8 +141,8 @@ def main():
     parser.add_argument(
         "--from-year",
         type=int,
-        default=2024,
-        help="Include only accidents from this year onwards (default: 2024)",
+        default=2022,
+        help="Include only accidents from this year onwards (default: 2022)",
     )
 
     args = parser.parse_args()
@@ -161,9 +166,8 @@ def main():
     df = clean_dataframe(df, from_year=args.from_year, limit=args.limit)
     df = geocode_addresses(df)
 
-    log.info(f"Records with coordinates ready to insert into DB: {len(df):,}")
-    log.info("Next step: insert into 'incidentes_historicos' table (under construction).")
-    # TODO: llamar a insert_into_db(df) — próximo paso
+    insert_into_db(df, reset=args.reset)
+    log.info("ETL complete ✓")
 
 def load_csv(path: str, limit: int | None = None) -> pd.DataFrame:
     log.info(f"Reading CSV: {path}")
@@ -364,6 +368,101 @@ def geocode_addresses(df: pd.DataFrame) -> pd.DataFrame:
     # Eliminar filas que no se pudieron geocodificar.
     df = df.dropna(subset=["lat", "lng"])
     return df
+
+BATCH_SIZE = 500
+SOURCE_NAME = "datos_abiertos_gov"
+
+def _parse_time(time_str: str) -> tuple[int, int, int]:
+# Convierte un string de tiempo en formato "HH:MM:SS AM/PM" a una tupla (h, m, s) en formato 24h.
+    parts = time_str.strip().lower().split(":")
+    h, m, s, meridian = int(parts[0]), int(parts[1]), int(parts[2]), parts[3]
+    if meridian == "am" and h == 12:
+        h = 0
+    elif meridian == "pm" and h != 12:
+        h += 12
+    return h, m, s
+
+def _build_datetime(date_iso:str, time_str: str) -> datetime:
+    # Combina una fecha ISO (YYYY-MM-DD) y un string de tiempo (HH:MM:SS AM/PM) en un objeto datetime.
+    date = datetime.fromisoformat(date_iso.split("T")[0])
+    h, m, s = _parse_time(time_str)
+    return date.replace(hour=h, minute=m, second=s)
+
+def _safe_int(value) -> int:
+    # Convierte un valor a entero, devolviendo 0 si el valor es nulo o no convertible.
+    if pd.isna(value):
+        return 0
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
+    
+def insert_into_db(df: pd.DataFrame, reset: bool = False) -> None:
+    """
+    Inserta los datos del DataFrame en la tabla 'incidentes_historicos' de PostgreSQL.
+    toda la operación ocurre en una transacción: si algo falla, no se insertan registros parciales.
+    """
+    database_url = os.environ.get("DATABASE_URL", "")
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is not configured. "
+            "Copy etl/.env.example to etl/.env and fill in your database connection string."
+        )
+    
+    log.info(f"Connecting to database at supabase...")
+    conn = psycopg2.connect(database_url)
+
+    try:
+        with conn.cursor() as cur:
+            if reset:
+                log.warning(f"--reset flag is set: deleting existing records from 'incidentes_historicos' for source '{SOURCE_NAME}'")
+                cur.execute("DELETE FROM public.incidentes_historicos WHERE origen_datos = %s", (SOURCE_NAME,))
+                log.info(f"Existing records deleted. {cur.rowcount} rows removed.")
+
+            rows = []
+            for _, row in df.iterrows():
+                try:
+                    accident_datetime = _build_datetime(row["FECHA_ACCIDENTE"], row["HORA_ACCIDENTE"])
+                except Exception as e:
+                    log.warning(f"Error parsing date/time for row with address '{row['normalized_address']}': {e}")
+                    continue
+
+                rows.append((
+                    accident_datetime,
+                    row["GRAVEDAD_ACCIDENTE"],
+                    row["CLASE_ACCIDENTE"],
+                    row["SITIO_EXACTO_ACCIDENTE"],   # direccion_original — para auditoría
+                    _safe_int(row["CANT_HERIDOS_EN__SITIO_ACCIDENTE"]),
+                    _safe_int(row["CANT_MUERTOS_EN__SITIO_ACCIDENTE"]),
+                    float(row["lng"]),   # ST_MakePoint recibe longitud PRIMERO
+                    float(row["lat"]),   # luego latitud — estándar PostGIS/WGS84
+                    SOURCE_NAME,
+                ))
+
+            log.info(f"Inserting {len(rows):,} records into 'incidentes_historicos'...")
+            sql = """
+                    INSERT INTO public.incidentes_historicos
+                        (fecha_hora, gravedad, clase_accidente, direccion_original,
+                        cant_heridos, cant_muertos, ubicacion, origen_datos)
+                    VALUES %s
+                """
+            template = (
+                "(%s, %s, %s, %s, %s, %s, "
+                "ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s)"
+            )
+
+            for i in tqdm(range(0, len(rows), BATCH_SIZE), desc="Inserting into DB"):
+                batch = rows[i : i + BATCH_SIZE]
+                execute_values(cur, sql, batch, template=template)
+
+            conn.commit()
+            log.info(f"Data insertion complete. {len(rows):,} records added to 'incidentes_historicos'.")
+
+    except Exception as e:
+        log.error(f"Error inserting data into 'incidentes_historicos': {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
