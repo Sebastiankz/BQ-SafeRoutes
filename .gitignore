@@ -53,6 +53,5 @@ firebase-credentials.json
 *.key
 
 # ── Otros ─────────────────────────────────────────
-*.md
 !README.md
 

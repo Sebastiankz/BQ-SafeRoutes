@@ -1,24 +1,38 @@
 import { Activity, Moon, Sun } from "lucide-react";
 import { Select, ListBox } from "@heroui/react";
 
-const AÑOS = ['Todos', 2022, 2023, 2024, 2025];
+const AÑOS = ["Todos", 2022, 2023, 2024, 2025];
 const GRAVEDADES = ["Todas", "Solo Daños", "Heridos", "Muertos"];
 const MESES = [
-  { id: 'Todos', label: 'Todos' },
-  { id: '1',  label: 'Enero'      }, { id: '2',  label: 'Febrero'    },
-  { id: '3',  label: 'Marzo'      }, { id: '4',  label: 'Abril'      },
-  { id: '5',  label: 'Mayo'       }, { id: '6',  label: 'Junio'      },
-  { id: '7',  label: 'Julio'      }, { id: '8',  label: 'Agosto'     },
-  { id: '9',  label: 'Septiembre' }, { id: '10', label: 'Octubre'    },
-  { id: '11', label: 'Noviembre'  }, { id: '12', label: 'Diciembre'  },
+  { id: "Todos", label: "Todos" },
+  { id: "1", label: "Enero" },
+  { id: "2", label: "Febrero" },
+  { id: "3", label: "Marzo" },
+  { id: "4", label: "Abril" },
+  { id: "5", label: "Mayo" },
+  { id: "6", label: "Junio" },
+  { id: "7", label: "Julio" },
+  { id: "8", label: "Agosto" },
+  { id: "9", label: "Septiembre" },
+  { id: "10", label: "Octubre" },
+  { id: "11", label: "Noviembre" },
+  { id: "12", label: "Diciembre" },
 ];
 
-export default function Header({ año, setAño, gravedad, setGravedad, mes, setMes, isDark, setIsDark }) {
+export default function Header({
+  año,
+  setAño,
+  gravedad,
+  setGravedad,
+  mes,
+  setMes,
+  isDark,
+  setIsDark,
+}) {
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
-
       {/* Lado izquierdo: logo + título */}
-      <div className="flex items-center gap-3">
+      <div className="flex items- gap-3">
         <div className="bg-blue-600 text-white p-2 rounded-lg">
           <Activity size={20} />
         </div>
@@ -27,17 +41,19 @@ export default function Header({ año, setAño, gravedad, setGravedad, mes, setM
             Monitor Vial Barranquilla
           </h1>
           <p className="text-xs text-slate-400 dark:text-gray-400 tracking-widest uppercase">
-            Plataforma de Prevención de Riesgos · {año === 'Todos' ? '2022 – 2025' : año}
+            Plataforma de Prevención de Riesgos ·{" "}
+            {año === "Todos" ? "2022 – 2025" : año}
           </p>
         </div>
       </div>
 
       {/* Lado derecho: filtros + toggle */}
       <div className="flex flex-wrap items-center gap-3">
-
         {/* Filtro Gravedad */}
         <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">Gravedad</span>
+          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
+            Gravedad
+          </span>
           <Select
             className="w-36"
             placeholder="Gravedad"
@@ -66,14 +82,16 @@ export default function Header({ año, setAño, gravedad, setGravedad, mes, setM
 
         {/* Filtro Año */}
         <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">Período</span>
+          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
+            Período
+          </span>
           <Select
             className="w-28"
             placeholder="Período"
             selectedKey={String(año)}
             onSelectionChange={(key) => {
               const val = key instanceof Set ? [...key][0] : key;
-              if (val != null) setAño(val === 'Todos' ? 'Todos' : Number(val));
+              if (val != null) setAño(val === "Todos" ? "Todos" : Number(val));
             }}
           >
             <Select.Trigger>
@@ -83,7 +101,11 @@ export default function Header({ año, setAño, gravedad, setGravedad, mes, setM
             <Select.Popover>
               <ListBox>
                 {AÑOS.map((a) => (
-                  <ListBox.Item key={String(a)} id={String(a)} textValue={String(a)}>
+                  <ListBox.Item
+                    key={String(a)}
+                    id={String(a)}
+                    textValue={String(a)}
+                  >
                     {String(a)}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
@@ -95,7 +117,9 @@ export default function Header({ año, setAño, gravedad, setGravedad, mes, setM
 
         {/* Filtro Mes */}
         <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">Mes</span>
+          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
+            Mes
+          </span>
           <Select
             className="w-36"
             placeholder="Mes"
@@ -126,11 +150,10 @@ export default function Header({ año, setAño, gravedad, setGravedad, mes, setM
         <button
           onClick={() => setIsDark(!isDark)}
           className="p-2 rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-          title={isDark ? 'Modo claro' : 'Modo oscuro'}
+          title={isDark ? "Modo claro" : "Modo oscuro"}
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-
       </div>
     </header>
   );
