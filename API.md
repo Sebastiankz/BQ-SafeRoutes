@@ -199,7 +199,7 @@ Obtiene un usuario por ID.
 | Campo        | Tipo              | Descripción                                              |
 |--------------|-------------------|----------------------------------------------------------|
 | id           | int (PK)          | Autoincrementable                                        |
-| usuario_id   | int (FK)          | Referencia a usuarios                                    |
+| usuario_id   | UUID (FK)         | Referencia a usuarios (Supabase / Postgres)               |
 | tipo         | varchar(50)       | accidente, hueco, arroyo, semaforo_danado, otro          |
 | descripcion  | text              | Opcional                                                 |
 | foto_url     | varchar(500)      | Opcional                                                 |
