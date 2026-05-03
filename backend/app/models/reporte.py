@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Optional
 
 from geoalchemy2 import Geometry
 from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, func
@@ -13,8 +16,8 @@ class Reporte(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
     tipo: Mapped[str] = mapped_column(String(50), nullable=False)
-    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
-    foto_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    descripcion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     ubicacion: Mapped[str] = mapped_column(Geometry("POINT", srid=4326), nullable=False)
     severidad: Mapped[int] = mapped_column(Integer, default=1)
     validaciones: Mapped[int] = mapped_column(Integer, default=0)
