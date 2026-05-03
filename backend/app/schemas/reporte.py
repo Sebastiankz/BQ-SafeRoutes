@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +19,7 @@ class ReporteCreate(BaseModel):
 
 class ReporteOut(BaseModel):
     id: int
-    usuario_id: int
+    usuario_id: UUID
     tipo: str
     descripcion: str | None = None
     foto_url: str | None = None

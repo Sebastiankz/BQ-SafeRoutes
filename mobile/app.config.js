@@ -6,7 +6,6 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: true,
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
@@ -14,9 +13,13 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      config: {
-        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY,
-      },
+      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim()
+        ? {
+            config: {
+              googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY.trim(),
+            },
+          }
+        : {}),
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "SafeRoutes necesita tu ubicación para mostrarte riesgos cercanos.",
@@ -27,18 +30,20 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
       },
-      config: {
-        googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY,
-        },
-      },
+      usesCleartextTraffic: true,
+      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim()
+        ? {
+            config: {
+              googleMaps: {
+                apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY,
+              },
+            },
+          }
+        : {}),
       permissions: [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
       ],
-    },
-    web: {
-      favicon: "./assets/favicon.png",
     },
   },
 };
