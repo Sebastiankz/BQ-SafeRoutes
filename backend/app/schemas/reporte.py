@@ -1,28 +1,29 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
+TipoReporte = Literal["accidente", "hueco", "arroyo", "semaforo_danado", "otro"]
+
+
 class ReporteCreate(BaseModel):
-    tipo: str = Field(..., description="Tipo de incidente: accidente, hueco, arroyo, semaforo_danado, otro")
-    descripcion: Optional[str] = None
-    foto_url: Optional[str] = None
-    latitud: float = Field(..., ge=-90, le=90)
-    longitud: float = Field(..., ge=-180, le=180)
-    severidad: int = Field(default=1, ge=1, le=5)
+    tipo: TipoReporte
+    descripcion: str | None = None
+    foto_url: str | None = None
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    severidad: int = Field(ge=1, le=5)
 
 
-class ReporteRead(BaseModel):
+class ReporteOut(BaseModel):
     id: int
     usuario_id: int
     tipo: str
-    descripcion: Optional[str]
-    foto_url: Optional[str]
+    descripcion: str | None = None
+    foto_url: str | None = None
     latitud: float
     longitud: float
     severidad: int
     validaciones: int
     created_at: datetime
-
-    model_config = {"from_attributes": True}

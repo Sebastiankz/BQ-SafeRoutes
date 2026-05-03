@@ -1,83 +1,71 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func as sa_func
-from sqlalchemy.ext.asyncio import AsyncSession
-from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.reporte import Reporte
-from app.schemas.reporte import ReporteCreate, ReporteRead
+from ..database import get_db
+from ..models import Reporte
+from ..schemas import ReporteCreate, ReporteOut
 
-router = APIRouter(prefix="/reportes", tags=["Reportes"])
+router = APIRouter(prefix="/reportes", tags=["reportes"])
 
 
-def _row_to_read(row: Reporte, lat: float, lon: float) -> ReporteRead:
-    return ReporteRead(
-        id=row.id,
-        usuario_id=row.usuario_id,
-        tipo=row.tipo,
-        descripcion=row.descripcion,
-        foto_url=row.foto_url,
-        latitud=lat,
-        longitud=lon,
-        severidad=row.severidad,
-        validaciones=row.validaciones,
-        created_at=row.created_at,
+def _build_reporte_select():
+    return select(
+        Reporte.id,
+        Reporte.usuario_id,
+        Reporte.tipo,
+        Reporte.descripcion,
+        Reporte.foto_url,
+        func.ST_Y(Reporte.ubicacion).label("latitud"),
+        func.ST_X(Reporte.ubicacion).label("longitud"),
+        Reporte.severidad,
+        Reporte.validaciones,
+        Reporte.created_at,
     )
 
 
-@router.post("/", response_model=ReporteRead, status_code=201)
-async def crear_reporte(data: ReporteCreate, db: AsyncSession = Depends(get_db)):
-    point = ST_SetSRID(ST_MakePoint(data.longitud, data.latitud), 4326)
-
+@router.post("/", response_model=ReporteOut, status_code=status.HTTP_201_CREATED)
+def crear_reporte(payload: ReporteCreate, db: Session = Depends(get_db)):
     reporte = Reporte(
-        usuario_id=1,  # TODO: obtener del token JWT (semana 4)
-        tipo=data.tipo,
-        descripcion=data.descripcion,
-        foto_url=data.foto_url,
-        ubicacion=point,
-        severidad=data.severidad,
+        usuario_id=1,  # Temporal hasta implementar autenticacion JWT
+        tipo=payload.tipo,
+        descripcion=payload.descripcion,
+        foto_url=payload.foto_url,
+        ubicacion=func.ST_SetSRID(func.ST_MakePoint(payload.longitud, payload.latitud), 4326),
+        severidad=payload.severidad,
     )
     db.add(reporte)
-    await db.commit()
-    await db.refresh(reporte)
+    db.commit()
 
-    return _row_to_read(reporte, data.latitud, data.longitud)
-
-
-@router.get("/", response_model=list[ReporteRead])
-async def listar_reportes(
-    limit: int = Query(default=50, le=200),
-    offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
-):
-    from geoalchemy2.functions import ST_X, ST_Y
-
-    stmt = (
-        select(
-            Reporte,
-            ST_Y(Reporte.ubicacion).label("lat"),
-            ST_X(Reporte.ubicacion).label("lon"),
-        )
-        .order_by(Reporte.created_at.desc())
-        .limit(limit)
-        .offset(offset)
+    created = (
+        db.execute(_build_reporte_select().where(Reporte.id == reporte.id))
+        .mappings()
+        .first()
     )
-    result = await db.execute(stmt)
-    rows = result.all()
-    return [_row_to_read(r[0], r[1], r[2]) for r in rows]
+    return created
 
 
-@router.get("/{reporte_id}", response_model=ReporteRead)
-async def obtener_reporte(reporte_id: int, db: AsyncSession = Depends(get_db)):
-    from geoalchemy2.functions import ST_X, ST_Y
+@router.get("/", response_model=list[ReporteOut])
+def listar_reportes(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.execute(_build_reporte_select().order_by(Reporte.id.desc()).limit(limit).offset(offset))
+        .mappings()
+        .all()
+    )
+    return rows
 
-    stmt = select(
-        Reporte,
-        ST_Y(Reporte.ubicacion).label("lat"),
-        ST_X(Reporte.ubicacion).label("lon"),
-    ).where(Reporte.id == reporte_id)
-    result = await db.execute(stmt)
-    row = result.first()
+
+@router.get("/{reporte_id}", response_model=ReporteOut)
+def obtener_reporte(reporte_id: int, db: Session = Depends(get_db)):
+    row = (
+        db.execute(_build_reporte_select().where(Reporte.id == reporte_id))
+        .mappings()
+        .first()
+    )
     if not row:
         raise HTTPException(status_code=404, detail="Reporte no encontrado")
-    return _row_to_read(row[0], row[1], row[2])
+    return row

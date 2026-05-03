@@ -1,48 +1,27 @@
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from .database import engine, Base, get_db
+from . import models  # noqa: F401  # registra modelos para create_all
+from .routers import reportes_router, usuarios_router, hotspots_router
 
-from app.core.config import get_settings
-from app.routers import health, reportes, hotspots, usuarios
+# Crea tablas faltantes al iniciar (MVP). Para produccion, usar migraciones.
+Base.metadata.create_all(bind=engine)
 
+app = FastAPI(title="SafeRoutes BQ API")
+app.include_router(reportes_router)
+app.include_router(usuarios_router)
+app.include_router(hotspots_router)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup — verifica la conexión a Supabase antes de aceptar requests.
-    # Si la BD no responde, el error aparece al arrancar (no en el primer request).
-    from sqlalchemy import text
-    from app.database import async_session
-    import logging
-    log = logging.getLogger("uvicorn")
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "SafeRoutes BQ API"}
+
+@app.get("/health/db")
+def health_db(db: Session = Depends(get_db)):
     try:
-        async with async_session() as session:
-            await session.execute(text("SELECT 1"))
-        log.info("Database connection OK (Supabase)")
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "reachable"}
     except Exception as e:
-        log.error(f"Database connection FAILED: {e}")
-    yield
-    # Shutdown
-
-
-settings = get_settings()
-
-app = FastAPI(
-    title="SafeRoutes BQ API",
-    description="API para la gestión preventiva de seguridad vial en Barranquilla",
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # En producción, restringir a dominios específicos
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(health.router)
-app.include_router(reportes.router)
-app.include_router(hotspots.router)
-app.include_router(usuarios.router)
+        raise HTTPException(status_code=503, detail=str(e))

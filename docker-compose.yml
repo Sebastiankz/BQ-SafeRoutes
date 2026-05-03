@@ -1,5 +1,5 @@
-# Cada entrada bajo "services" es un contenedor independiente.
-# Docker los conecta en una red interna: se hablan por nombre (db, redis, backend).
+# Opcional: Postgres + Redis locales. El backend FastAPI va con venv (backend/README.md);
+# el dashboard web suele ir con `npm run dev` en web-dashboard/.
 services:
 
   # ── BASE DE DATOS ────────────────────────────────────────────────────────────
@@ -74,78 +74,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # ── BACKEND ──────────────────────────────────────────────────────────────────
-  backend:
-    # A diferencia de db y redis, esta imagen NO viene de Docker Hub.
-    # Docker la construye desde el Dockerfile que está en ./backend/.
-    build:
-      context: ./backend      # carpeta donde está el Dockerfile
-      dockerfile: Dockerfile  # nombre del archivo (por si hubiera varios)
-
-    container_name: saferoutes-backend
-    restart: unless-stopped
-
-    environment:
-      # URL completa de conexión a la BD.
-      # Nota: la dirección es "db" (nombre del servicio), no "localhost".
-      # Dentro de la red Docker, los servicios se encuentran por su nombre.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-saferoutes}:${POSTGRES_PASSWORD:-saferoutes_dev}@db:5432/${POSTGRES_DB:-saferoutes}
-
-      # URL de conexión a Redis, igual: por nombre de servicio.
-      REDIS_URL: redis://redis:6379/0
-
-      # Clave secreta para firmar tokens JWT de autenticación.
-      # En producción debe ser una cadena larga y aleatoria.
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
-
-      # Permite al código saber si está en desarrollo o producción
-      # (por ejemplo, para mostrar más logs o desactivar el modo debug).
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-
-    # El backend escucha en el puerto 8000 dentro del contenedor.
-    # Lo mapeamos al mismo puerto en tu Mac → http://localhost:8000
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-
-    volumes:
-      # Monta tu carpeta local de código dentro del contenedor.
-      # Efecto: cuando guardas un .py en tu editor, Uvicorn lo detecta
-      # y recarga el servidor automáticamente (hot reload).
-      # Sin esto tendrías que reconstruir la imagen en cada cambio.
-      - ./backend/app:/app/app
-
-    # El backend NO arranca hasta que db y redis estén "healthy".
-    # Sin esto, FastAPI intentaría conectarse a la BD antes de que existiera y fallaría.
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # ── WEB DASHBOARD ────────────────────────────────────────────────────────────
-  # Frontend Vite + TypeScript compilado a estáticos y servido por nginx.
-  # Imagen multi-stage: Node compila, nginx sirve. Resultado final ~25 MB.
-  web-dashboard:
-    build:
-      context: ./web-dashboard
-      dockerfile: Dockerfile
-
-    container_name: saferoutes-web
-
-    restart: unless-stopped
-
-    # nginx escucha en el puerto 80 dentro del contenedor.
-    # Lo exponemos en el 5173 de tu Mac (puerto típico de Vite en dev)
-    # para no chocar con otros servicios web locales.
-    ports:
-      - "${WEB_PORT:-5173}:80"
-
-    # Espera a que el backend esté arriba: el dashboard hace proxy /api → backend.
-    # Si el backend aún no escucha, nginx devolvería 502 al cargar datos.
-    depends_on:
-      backend:
-        condition: service_started
 
 # ── VOLÚMENES NOMBRADOS ───────────────────────────────────────────────────────
 # Docker gestiona estos volúmenes fuera de tu sistema de archivos normal.
