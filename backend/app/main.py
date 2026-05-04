@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import get_settings
 from .database import engine, Base, get_db
 from . import models  # noqa: F401
-from .routers import reportes_router, hotspots_router
+from .routers import reportes_router, hotspots_router, incidentes_router
 
 settings = get_settings()
 
@@ -41,6 +41,7 @@ app.add_middleware(
 
 app.include_router(reportes_router)
 app.include_router(hotspots_router)
+app.include_router(incidentes_router)
 
 
 @app.get("/health")

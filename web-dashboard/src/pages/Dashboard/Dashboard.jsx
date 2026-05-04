@@ -82,7 +82,7 @@ export default function Dashboard() {
           {result && !loading && (
             <>
               {/* Mapa de Calor */}
-              <MapaLeaflet />
+              <MapaLeaflet año={año} mes={mes} />
 
               {/* Fila 1: Área (ancho completo) */}
               <HourlyChart data={result.hourlyData} />

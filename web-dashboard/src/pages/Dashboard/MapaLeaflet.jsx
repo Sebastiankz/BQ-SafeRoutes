@@ -1,13 +1,11 @@
 // src/pages/Dashboard/MapaLeaflet.jsx
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Exponer L globalmente para leaflet.heat (se hace una sola vez al cargar el módulo)
 window.L = L;
 
-// Fix de íconos rotos en Vite (bug conocido de Leaflet)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -16,76 +14,92 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// ── Puntos del heatmap [lat, lng, intensidad] ─────────────────
-// Coordenadas verificadas en OpenStreetMap para Barranquilla
-const PUNTOS_CALOR = [
-  // ── Av. Circunvalar × Calle 110 (epicentro principal) ──
-  [11.0183, -74.8066, 1.0],
-  [11.0177, -74.8062, 1.0],
-  [11.017, -74.8058, 1.0],
-  [11.0163, -74.8054, 1.0],
-  [11.0156, -74.805, 0.95],
+// ── Radio y blur por zoom ─────────────────────────────────────
+function getHeatOptions(zoom) {
+  if (zoom >= 16) return { radius: 25, blur: 22 };
+  if (zoom >= 15) return { radius: 22, blur: 20 };
+  if (zoom >= 14) return { radius: 18, blur: 16 };
+  if (zoom >= 13) return { radius: 14, blur: 12 };
+  if (zoom >= 12) return { radius: 10, blur: 9 };
+  if (zoom >= 11) return { radius: 8, blur: 7 };
+  return { radius: 6, blur: 5 };
+}
 
-  // ── Av. Circunvalar sector norte (Calle 98 - Calle 110) ──
-  [11.014, -74.8045, 0.9],
-  [11.012, -74.8038, 0.9],
-  [11.01, -74.803, 0.85],
-  [11.008, -74.8025, 0.85],
-
-  // ── Av. Circunvalar sector medio (Calle 72 - Calle 98) ──
-  [11.006, -74.802, 0.8],
-  [11.004, -74.8015, 0.8],
-  [11.002, -74.801, 0.75],
-  [10.9995, -74.8005, 0.75],
-  [10.997, -74.8, 0.7],
-
-  // ── Calle 72 (corredor E-O) ──
-  [10.9958, -74.82, 0.65],
-  [10.9958, -74.81, 0.7],
-  [10.9958, -74.8, 0.75],
-  [10.9958, -74.79, 0.65],
-
-  // ── Calle 30 / Vía 40 ──
-  [10.972, -74.81, 0.5],
-  [10.972, -74.8, 0.55],
-  [10.972, -74.79, 0.5],
-];
-
-// ── Componente interno que accede al mapa de Leaflet ─────────
-function CapaCalor() {
+// ── Capa de calor ─────────────────────────────────────────────
+function CapaCalor({ puntos, heatMax }) {
   const map = useMap();
 
   useEffect(() => {
+    if (!puntos || puntos.length === 0) return;
+
     let heat;
 
-    // Dynamic import: se ejecuta DESPUÉS de que window.L = L ya está asignado
     import("leaflet.heat").then(() => {
-      heat = L.heatLayer(PUNTOS_CALOR, {
-        radius: 22,
-        blur: 15,
-        maxZoom: 16,
-        max: 1.0,
-        // Gradiente tipo temperatura: verde → amarillo → naranja → rojo
+      const { radius, blur } = getHeatOptions(map.getZoom());
+
+      heat = L.heatLayer(puntos, {
+        radius,
+        blur,
+        maxZoom: 17,
+        max: heatMax,
+        // minOpacity alto para que los puntos sean visibles aunque no
+        // se solapen — sin esto los puntos de baja densidad son invisibles
+        minOpacity: 0.4,
         gradient: {
-          0.0: "#22c55e",
-          0.3: "#84cc16",
-          0.5: "#eab308",
-          0.7: "#f97316",
-          1.0: "#dc2626",
+          0.0: "#313695",
+          0.2: "#4575b4",
+          0.4: "#74add1",
+          0.55: "#fee090",
+          0.7: "#f46d43",
+          0.85: "#d73027",
+          1.0: "#a50026",
         },
       }).addTo(map);
+
+      const updateHeat = () => {
+        const opts = getHeatOptions(map.getZoom());
+        heat.setOptions(opts);
+        heat.redraw();
+      };
+
+      map.on("zoomend", updateHeat);
+      heat._zoomHandler = updateHeat;
     });
 
     return () => {
-      if (heat) map.removeLayer(heat);
+      if (heat) {
+        if (heat._zoomHandler) map.off("zoomend", heat._zoomHandler);
+        map.removeLayer(heat);
+      }
     };
-  }, [map]);
+  }, [map, puntos, heatMax]);
 
   return null;
 }
 
 // ── Componente principal ──────────────────────────────────────
-export default function MapaLeaflet() {
+export default function MapaLeaflet({ año, mes }) {
+  const [puntos, setPuntos] = useState([]);
+  const [heatMax, setHeatMax] = useState(0.6);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    setCargando(true);
+    const params = new URLSearchParams();
+    if (año && año !== "Todos") params.set("ano", año);
+    if (mes && mes !== "Todos") params.set("mes", mes);
+    const qs = params.toString();
+    const url = `/api/incidentes-historicos/heatmap${qs ? `?${qs}` : ""}`;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then(({ points, heat_max }) => {
+        setPuntos(points);
+        setHeatMax(heat_max);
+      })
+      .finally(() => setCargando(false));
+  }, [año, mes]);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
       <div className="flex items-center justify-between mb-3">
@@ -105,22 +119,25 @@ export default function MapaLeaflet() {
             <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />{" "}
             Alto
           </span>
+          {cargando && (
+            <span className="text-slate-300 dark:text-gray-600 italic">
+              cargando...
+            </span>
+          )}
         </div>
       </div>
 
-      {/* MapContainer necesita altura fija — no puede ser % */}
       <MapContainer
         center={[11.006, -74.8035]}
         zoom={13}
         style={{ height: "320px", width: "100%", borderRadius: "12px" }}
         scrollWheelZoom={false}
       >
-        {/* Tiles de OpenStreetMap — gratis, sin API key */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <CapaCalor />
+        <CapaCalor puntos={puntos} heatMax={heatMax} />
       </MapContainer>
     </div>
   );

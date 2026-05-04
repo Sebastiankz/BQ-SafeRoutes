@@ -19,15 +19,21 @@ export default function KPICard({ titulo, valor, tendencia, icono, color }) {
         <p className="text-2xl font-bold text-slate-800 dark:text-white">
           {valor.toLocaleString("es-CO")}
         </p>
-        <div
-          className={`flex items-center gap-1 text-xs font-semibold mt-1 ${esSube ? "text-emerald-500" : "text-red-500"}`}
-        >
-          {esSube ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-          <span>
-            {esSube ? "+" : ""}
-            {tendencia}% vs mes anterior
-          </span>
-        </div>
+        {tendencia !== null ? (
+          <div
+            className={`flex items-center gap-1 text-xs font-semibold mt-1 ${esSube ? "text-emerald-500" : "text-red-500"}`}
+          >
+            {esSube ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            <span>
+              {esSube ? "+" : ""}
+              {tendencia}% vs año anterior
+            </span>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-300 dark:text-gray-600 mt-1">
+            sin dato comparativo
+          </p>
+        )}
       </div>
     </div>
   );

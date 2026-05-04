@@ -35,8 +35,8 @@ const AÑOS_RANGO = [2022, 2023, 2024, 2025];
 function calcularTodo(filas, año, gravedad, mes) {
   // 1. Filtrar por año ('Todos' incluye 2022-2025)
   let f = año === 'Todos'
-    ? filas.filter(r => AÑOS_RANGO.includes(Number(r.AÑO_ACCIDENTE)))
-    : filas.filter(r => String(r.AÑO_ACCIDENTE) === String(año));
+    ? filas.filter(r => AÑOS_RANGO.includes(Number(r.ANO_ACCIDENTE)))
+    : filas.filter(r => String(r.ANO_ACCIDENTE) === String(año));
   const gravedadCSV = GRAVEDAD_MAP[gravedad];
   if (gravedadCSV) f = f.filter(r => r.GRAVEDAD_ACCIDENTE === gravedadCSV);
   // 2. Filtrar por mes (MES_ACCIDENTE en CSV es nombre en inglés)
@@ -55,16 +55,19 @@ function calcularTodo(filas, año, gravedad, mes) {
   // Tendencia: compara mismo mes del año anterior (o año completo si mes = 'Todos')
   let anterior = total; // default: sin cambio
   if (año !== 'Todos') {
-    let fAnterior = filas.filter(r => String(r.AÑO_ACCIDENTE) === String(año - 1));
+    let fAnterior = filas.filter(r => String(r.ANO_ACCIDENTE) === String(año - 1));
     const gravedadCSV2 = GRAVEDAD_MAP[gravedad];
     if (gravedadCSV2) fAnterior = fAnterior.filter(r => r.GRAVEDAD_ACCIDENTE === gravedadCSV2);
     if (mes !== 'Todos') {
       const mesCsvAnterior = MES_CSV_MAP[String(mes)];
       if (mesCsvAnterior) fAnterior = fAnterior.filter(r => r.MES_ACCIDENTE === mesCsvAnterior);
     }
-    anterior = fAnterior.length || 1;
+    anterior = fAnterior.length;
   }
-  const t1 = año === 'Todos' ? 0 : parseFloat((((total - anterior) / anterior) * 100).toFixed(1));
+  // null = sin dato comparable (no mostrar tendencia)
+  const t1 = (año === 'Todos' || anterior === 0)
+    ? null
+    : parseFloat((((total - anterior) / anterior) * 100).toFixed(1));
 
   // ── Gráfica 1: accidentes por hora (normalizado 0-100) ──
   const porHora = Array.from({ length: 24 }, (_, i) => ({ hora: `${String(i).padStart(2,'0')}:00`, valor: 0 }));
