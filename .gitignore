@@ -56,4 +56,5 @@ firebase-credentials.json
 # ── Otros ─────────────────────────────────────────
 !README.md
 
+*.md
 .mcp.json
