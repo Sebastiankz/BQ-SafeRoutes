@@ -9,8 +9,15 @@ export default defineConfig({
   ],
   server: {
     watch: {
-      usePolling: true,   // ← solución al problema
-      interval: 300,      // revisa cambios cada 300ms
+      usePolling: true,
+      interval: 300,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
 })
