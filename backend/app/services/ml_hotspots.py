@@ -73,6 +73,7 @@ def generate_hotspots(
             for p in cluster_points_rad
         ])
         radius = distances.max()
+        radius = max(radius, 50.0)  # Minimum radius of 50 meters to ensure visibility
 
         n = cluster_points.shape[0]
         if n > 30:
