@@ -73,6 +73,8 @@ export default function MapScreen() {
   const [errorReportes, setErrorReportes] = useState<string | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
 
+  const [heatmapMode, setHeatmapMode] = useState(false);
+
   const debeMostrarListaSinGoogleMaps = !tieneClaveGoogleMaps;
 
   const ubicacionParaReporte = useMemo(() => {
@@ -202,7 +204,7 @@ export default function MapScreen() {
           showsMyLocationButton
           showsUserLocation
         >
-          {reportes.map((r) => (
+          {!heatmapMode && reportes.map((r) => (
             <Marker
               key={r.id}
               coordinate={{ latitude: r.latitud, longitude: r.longitud }}
@@ -211,16 +213,18 @@ export default function MapScreen() {
               title={`${r.tipo} · sev. ${r.severidad}`}
             />
           ))}
-          {hotspots.map((h) => (
+
+          {heatmapMode && hotspots.map((h) => (
             <Circle
               key={`hotspot-${h.id}`}
               center={{ latitude: h.latitud, longitude: h.longitud }}
               radius={h.radio_metros}
-              fillColor={`${COLOR_RIESGO[h.nivel_riesgo] ?? "#E53E3E"}30`}
-              strokeColor={COLOR_RIESGO[h.nivel_riesgo] ?? "#E53E3E"}
-              strokeWidth={1.5}
+              fillColor={`${COLOR_RIESGO[h.nivel_riesgo.toLowerCase()] ?? "#E53E3E"}55`}
+              strokeColor={COLOR_RIESGO[h.nivel_riesgo.toLowerCase()] ?? "#E53E3E"}
+              strokeWidth={2}
             />
           ))}
+          
         </MapView>
       )}
 
@@ -235,7 +239,7 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <View style={[styles.fabFila, { top: insetSuperior }]}>
+      <View style={[styles.fabFila, styles.fabFilaGap, { top: insetSuperior }]}>
         <Pressable
           accessibilityLabel="Actualizar reportes"
           accessibilityRole="button"
@@ -243,6 +247,15 @@ export default function MapScreen() {
           onPress={() => void cargarReportes()}
         >
           <Text style={styles.fabIcono}>↻</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel={heatmapMode ? "Disable heatmap" : "Enable heatmap"}
+          accessibilityRole="button"
+          style={[styles.fab, heatmapMode && styles.fabActive]}
+          onPress={() => setHeatmapMode((v) => !v)}
+        >
+          <Text style={[styles.fabIcono, heatmapMode && styles.fabActiveIcon]}>🔥</Text>
         </Pressable>
       </View>
 
@@ -378,4 +391,13 @@ const styles = StyleSheet.create({
   filaTipo: { fontSize: 15, fontWeight: "700", color: "#E53E3E", textTransform: "capitalize" },
   filaMeta: { fontSize: 12, color: "#718096", marginTop: 2 },
   filaDesc: { fontSize: 14, color: "#2d3748", marginTop: 6 },
+    fabFilaGap: {
+    gap: 10,
+  },
+  fabActive: {
+    backgroundColor: "#E53E3E",
+  },
+  fabActiveIcon: {
+    fontSize: 20,
+  },
 });

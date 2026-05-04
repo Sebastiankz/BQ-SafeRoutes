@@ -23,6 +23,7 @@ def list_hotspots(
     activo: bool = Query(default=True),
     year: int = Query(default=None),
     month: int = Query(default=None),
+    global_only: bool = Query(default=False, alias="global"),
     db: Session = Depends(get_db),
 ):
     query = select(
@@ -39,10 +40,13 @@ def list_hotspots(
         Hotspot.created_at,
         Hotspot.updated_at,
     ).where(Hotspot.activo == activo)
-    if year is not None:
-        query = query.where(Hotspot.year == year)
-    if month is not None:
-        query = query.where(Hotspot.month == month)
+    if global_only:
+        query = query.where(Hotspot.year.is_(None)).where(Hotspot.month.is_(None))
+    else:
+        if year is not None:
+            query = query.where(Hotspot.year == year)
+        if month is not None:
+            query = query.where(Hotspot.month == month)
     rows = (
         db.execute(query)
         .mappings()

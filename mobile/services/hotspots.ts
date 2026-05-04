@@ -17,9 +17,9 @@ export async function listarHotspots(): Promise<Hotspot[]> {
   const base = apiBaseUrl();
   if (!base) throw new Error("Define EXPO_PUBLIC_API_URL en mobile/.env");
 
-  const res = await fetch(`${base}/hotspots/?activo=true`, {
+  const res = await fetch(`${base}/hotspots/?activo=true&global=true`, {
     headers: { Accept: "application/json" },
-  });
+  }); 
 
   if (!res.ok) {
     throw new Error(`Error al cargar hotspots: ${res.status}`);
