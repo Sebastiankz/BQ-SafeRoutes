@@ -1,4 +1,5 @@
 ﻿from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 _MESES_EN = {
@@ -16,9 +17,9 @@ class IncidenteHistoricoOut(BaseModel):
     mes_accidente:      str        = Field(serialization_alias="MES_ACCIDENTE")
     dia_accidente:      str        = Field(serialization_alias="DIA_ACCIDENTE")
     hora_accidente:     str        = Field(serialization_alias="HORA_ACCIDENTE")
-    gravedad_accidente: str | None = Field(default=None, serialization_alias="GRAVEDAD_ACCIDENTE")
-    clase_accidente:    str | None = Field(default=None, serialization_alias="CLASE_ACCIDENTE")
-    sitio_normalizado:  str | None = Field(default=None, serialization_alias="SITIO_NORMALIZADO")
+    gravedad_accidente: Optional[str] = Field(default=None, serialization_alias="GRAVEDAD_ACCIDENTE")
+    clase_accidente:    Optional[str] = Field(default=None, serialization_alias="CLASE_ACCIDENTE")
+    sitio_normalizado:  Optional[str] = Field(default=None, serialization_alias="SITIO_NORMALIZADO")
     cant_heridos_sitio: int        = Field(default=0, serialization_alias="CANT_HERIDOS_EN _SITIO_ACCIDENTE")
     cant_muertos_sitio: int        = Field(default=0, serialization_alias="CANT_MUERTOS_EN _SITIO_ACCIDENTE")
 

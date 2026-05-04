@@ -1,4 +1,5 @@
 # src/routers/incidentes_historicos.py
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, case, extract, Numeric
 from sqlalchemy.orm import Session
@@ -13,8 +14,8 @@ router = APIRouter(prefix="/incidentes-historicos", tags=["incidentes-historicos
 
 @router.get("/heatmap")
 def heatmap_points(
-    ano: int | None = Query(default=None, description="Año (ej: 2023). Omitir = 2022-2025."),
-    mes: int | None = Query(default=None, ge=1, le=12, description="Mes numérico (1-12). Omitir = todos."),
+    ano: Optional[int] = Query(default=None, description="Año (ej: 2023). Omitir = 2022-2025."),
+    mes: Optional[int] = Query(default=None, ge=1, le=12, description="Mes numérico (1-12). Omitir = todos."),
     db: Session = Depends(get_db),
 ):
     """
