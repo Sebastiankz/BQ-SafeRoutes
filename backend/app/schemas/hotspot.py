@@ -9,7 +9,7 @@ class HotspotOut(BaseModel):
     latitud: float
     longitud: float
     radio_metros: float
-    nivel_riesgo: Literal["bajo", "medio", "alto"]
+    nivel_riesgo: Literal["Bajo", "Medio", "Alto"]
     num_incidentes: int
     origen: Literal["ipat", "ciudadano", "mixto"]
     activo: bool

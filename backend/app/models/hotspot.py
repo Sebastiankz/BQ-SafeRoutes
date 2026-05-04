@@ -11,6 +11,8 @@ class Hotspot(Base):
     nivel_riesgo   = Column(String(20), nullable=False)
     num_incidentes = Column(Integer, default=0)
     origen         = Column(String(20), nullable=False)
+    year  = Column(Integer, nullable=True)
+    month = Column(Integer, nullable=True)
     activo         = Column(Boolean, default=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
     updated_at     = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

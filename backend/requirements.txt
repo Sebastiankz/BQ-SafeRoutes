@@ -7,3 +7,6 @@ geoalchemy2>=0.14.0
 PyJWT[crypto]>=2.8.0
 slowapi>=0.1.9
 pydantic-settings>=2.0.0
+
+# DBSCAN
+scikit-learn==1.5.0

@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -10,7 +10,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_usuario_uuid(
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
 ) -> UUID:
     """Requiere Authorization: Bearer <jwt>. Para rutas públicas no uses esta dependencia."""
     if creds is None or (creds.scheme or "").lower() != "bearer" or not creds.credentials.strip():
