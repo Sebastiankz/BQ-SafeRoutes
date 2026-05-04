@@ -33,6 +33,8 @@ def list_hotspots(
         Hotspot.nivel_riesgo,
         Hotspot.num_incidentes,
         Hotspot.origen,
+        Hotspot.year,
+        Hotspot.month,
         Hotspot.activo,
         Hotspot.created_at,
         Hotspot.updated_at,
