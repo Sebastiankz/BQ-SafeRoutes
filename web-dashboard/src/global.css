@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Habilita dark mode por clase en Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
