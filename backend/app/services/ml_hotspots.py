@@ -17,7 +17,7 @@ def haversine(p1: np.ndarray, p2: np.ndarray) -> float:
 
 def generate_hotspots(
         db: Session,
-        eps_meters: float = 150.0, # Search radius in meters
+        eps_meters: float = 80, # Search radius in meters
         min_samples: int = 5, # Minimum incidents required to form a hotspot
         origin: str = "dbscan_historico",
         year:  Optional[int] = None,

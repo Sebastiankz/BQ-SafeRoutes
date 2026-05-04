@@ -13,6 +13,7 @@ build/
 .venv/
 venv/
 *.egg
+env_backend/
 
 # ── Node / Frontend ───────────────────────────────
 node_modules/
@@ -56,3 +57,4 @@ firebase-credentials.json
 *.md
 !README.md
 
+.mcp.json

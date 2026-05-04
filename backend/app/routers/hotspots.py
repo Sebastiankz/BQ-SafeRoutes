@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -69,3 +69,32 @@ def generar_hotspots(
 ):
     total = generate_hotspots(db, eps_meters=eps_meters, min_samples=min_samples, year=year, month=month)
     return {"hotspots_created": total}
+
+@router.post("/regenerate-all")
+def regenerate_all_hotspots(
+    eps_meters: float = Query(default=80.0, gt=0, description="Radio de búsqueda en metros"),
+    min_samples: int = Query(default=5, ge=2, description="Número mínimo de incidentes para formar un hotspot"),
+    db: Session = Depends(get_db),
+):
+    summary = {}
+
+    summary["global"] = generate_hotspots(db, eps_meters=eps_meters, min_samples=min_samples)
+
+    year_months = db.execute(
+        text(
+            "SELECT DISTINCT EXTRACT(YEAR FROM fecha_hora)::int AS yr, "
+            "EXTRACT(MONTH FROM fecha_hora)::int AS mo "
+            "FROM incidentes_historicos ORDER BY yr, mo"
+        )
+    ).fetchall()
+
+    years_seen = set()
+    for row in year_months:
+        yr = row.yr
+        if yr not in years_seen:
+            years_seen.add(yr)
+            summary[str(yr)] = generate_hotspots(db, eps_meters=eps_meters, min_samples=min_samples, year=yr)
+        mo = row.mo
+        summary[f"{yr}-{mo:02d}"] = generate_hotspots(db, eps_meters=eps_meters, min_samples=min_samples, year=yr, month=mo)
+
+    return {"hotspots_generated": summary}
