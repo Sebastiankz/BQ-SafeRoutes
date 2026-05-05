@@ -1,5 +1,6 @@
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import type { DrawerNavigationProp } from "@react-navigation/drawer";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,13 +14,14 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Circle, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Heatmap, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
 
+import FiltroHotspotsSheet from "../components/FiltroHotspotsSheet";
 import NuevoReporteModal from "../components/NuevoReporteModal";
 import { useAuth } from "../context/AuthContext";
 import type { RootDrawerParamList } from "../navigation/types";
-import type { Hotspot } from "../services/hotspots";
+import type { Hotspot, HotspotFilter } from "../services/hotspots";
 import { listarHotspots } from "../services/hotspots";
 import type { Reporte } from "../services/reportes";
 import { listarReportes } from "../services/reportes";
@@ -49,11 +51,17 @@ const COLOR_POR_TIPO: Record<string, string> = {
   otro: "#718096",
 };
 
-const COLOR_RIESGO: Record<string, string> = {
-  alto: "#E53E3E",
-  medio: "#D69E2E",
-  bajo: "#38A169",
+const HEATMAP_GRADIENT = {
+      colors: ["#1a73e8", "#43e97b", "#f6d365", "#f08080", "#E53E3E"],                                                                                                                          
+      startPoints: [0.05, 0.25, 0.5, 0.75, 1.0],      
+  colorMapSize: 256,
 };
+
+function etiquetaFiltro(f: HotspotFilter): string {
+  if (f.mode === "global") return "Historico global";
+  if (f.mode === "year") return `Ano ${f.year}`;
+  return `${String(f.month).padStart(2, "0")}/${f.year}`;
+}
 
 export default function MapScreen() {
   const navigation = useNavigation<DrawerNav>();
@@ -74,6 +82,9 @@ export default function MapScreen() {
   const [modalNuevo, setModalNuevo] = useState(false);
 
   const [heatmapMode, setHeatmapMode] = useState(false);
+  const [filtroVisible, setFiltroVisible] = useState(false);
+  const [filtro, setFiltro] = useState<HotspotFilter>({ mode: "global" });
+  const [cargandoHotspots, setCargandoHotspots] = useState(false);
 
   const debeMostrarListaSinGoogleMaps = !tieneClaveGoogleMaps;
 
@@ -82,6 +93,18 @@ export default function MapScreen() {
     if (c) return { latitud: c.latitude, longitud: c.longitude };
     return { latitud: region.latitude, longitud: region.longitude };
   }, [coordsUsuario, region.latitude, region.longitude]);
+
+  const heatmapPoints = useMemo(
+    () =>
+      hotspots
+        .filter((h) => Number.isFinite(h.latitud) && Number.isFinite(h.longitud))
+        .map((h) => ({
+          latitude: h.latitud,
+          longitude: h.longitud,
+          weight: Math.max(1, h.num_incidentes ?? 1),
+        })),
+    [hotspots],
+  );
 
   async function obtenerUbicacion() {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -107,9 +130,8 @@ export default function MapScreen() {
   const cargarReportes = useCallback(async () => {
     setErrorReportes(null);
     try {
-      const [lista, hs] = await Promise.all([listarReportes(150, 0), listarHotspots()]);
+      const lista = await listarReportes(150, 0);
       setReportes(lista);
-      setHotspots(hs);
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
       const sugerencia =
@@ -122,13 +144,30 @@ export default function MapScreen() {
     }
   }, []);
 
+  const cargarHotspots = useCallback(async (f: HotspotFilter) => {
+    setCargandoHotspots(true);
+    setErrorReportes(null);
+    try {
+      const hs = await listarHotspots(f);
+      setHotspots(hs);
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : String(e);
+      setErrorReportes(mensaje);
+    } finally {
+      setCargandoHotspots(false);
+    }
+  }, []);
+
   useEffect(() => {
     void obtenerUbicacion();
   }, []);
 
   useEffect(() => {
-    if (!cargandoUbicacion) void cargarReportes();
-  }, [cargandoUbicacion, cargarReportes]);
+    if (!cargandoUbicacion) {
+      void cargarReportes();
+      void cargarHotspots(filtro);
+    }
+  }, [cargandoUbicacion, cargarReportes, cargarHotspots, filtro]);
 
   function pulsarNuevoReporte() {
     if (!token) {
@@ -139,6 +178,11 @@ export default function MapScreen() {
       return;
     }
     setModalNuevo(true);
+  }
+
+  function aplicarFiltro(f: HotspotFilter) {
+    setFiltro(f);
+    setHeatmapMode(true);
   }
 
   if (cargandoUbicacion) {
@@ -163,10 +207,12 @@ export default function MapScreen() {
           <Text style={styles.bannerErrorTexto}>{errorReportes}</Text>
         </View>
       )}
-      {cargandoReportes && !errorReportes && (
+      {(cargandoReportes || cargandoHotspots) && !errorReportes && (
         <View style={[styles.badgeCarga, { top: insetSuperior }]}>
           <ActivityIndicator size="small" color="#E53E3E" />
-          <Text style={styles.badgeCargaTxt}>Cargando reportes…</Text>
+          <Text style={styles.badgeCargaTxt}>
+            {cargandoHotspots ? "Cargando puntos criticos…" : "Cargando reportes…"}
+          </Text>
         </View>
       )}
 
@@ -214,17 +260,14 @@ export default function MapScreen() {
             />
           ))}
 
-          {heatmapMode && hotspots.map((h) => (
-            <Circle
-              key={`hotspot-${h.id}`}
-              center={{ latitude: h.latitud, longitude: h.longitud }}
-              radius={h.radio_metros}
-              fillColor={`${COLOR_RIESGO[h.nivel_riesgo.toLowerCase()] ?? "#E53E3E"}55`}
-              strokeColor={COLOR_RIESGO[h.nivel_riesgo.toLowerCase()] ?? "#E53E3E"}
-              strokeWidth={2}
+          {heatmapMode && heatmapPoints.length > 0 && (
+            <Heatmap
+              gradient={HEATMAP_GRADIENT}
+              opacity={0.85}
+              points={heatmapPoints}
+              radius={70}
             />
-          ))}
-          
+          )}
         </MapView>
       )}
 
@@ -235,7 +278,7 @@ export default function MapScreen() {
           style={styles.fabChico}
           onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
         >
-          <Text style={styles.iconoMenu}>☰</Text>
+          <MaterialCommunityIcons color="#2d3748" name="menu" size={24} />
         </Pressable>
       </View>
 
@@ -244,20 +287,48 @@ export default function MapScreen() {
           accessibilityLabel="Actualizar reportes"
           accessibilityRole="button"
           style={styles.fab}
-          onPress={() => void cargarReportes()}
+          onPress={() => {
+            void cargarReportes();
+            void cargarHotspots(filtro);
+          }}
         >
-          <Text style={styles.fabIcono}>↻</Text>
+          <MaterialCommunityIcons color="#2d3748" name="refresh" size={22} />
         </Pressable>
 
         <Pressable
-          accessibilityLabel={heatmapMode ? "Disable heatmap" : "Enable heatmap"}
+          accessibilityLabel={heatmapMode ? "Ocultar puntos criticos" : "Mostrar puntos criticos"}
           accessibilityRole="button"
+          accessibilityState={{ selected: heatmapMode }}
           style={[styles.fab, heatmapMode && styles.fabActive]}
           onPress={() => setHeatmapMode((v) => !v)}
         >
-          <Text style={[styles.fabIcono, heatmapMode && styles.fabActiveIcon]}>🔥</Text>
+          <MaterialCommunityIcons
+            color={heatmapMode ? "#fff" : "#2d3748"}
+            name="fire"
+            size={22}
+          />
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="Filtrar puntos criticos"
+          accessibilityRole="button"
+          style={[styles.fab, filtroVisible && styles.fabActive]}
+          onPress={() => setFiltroVisible(true)}
+        >
+          <MaterialCommunityIcons
+            color={filtroVisible ? "#fff" : "#2d3748"}
+            name="layers-triple-outline"
+            size={22}
+          />
         </Pressable>
       </View>
+
+      {heatmapMode && (
+        <View style={styles.chipFiltro} pointerEvents="none">
+          <MaterialCommunityIcons color="#fff" name="filter-variant" size={14} />
+          <Text style={styles.chipFiltroTxt}>{etiquetaFiltro(filtro)}</Text>
+        </View>
+      )}
 
       <Pressable
         accessibilityLabel={token ? "Nuevo reporte" : "Nuevo reporte (requiere cuenta)"}
@@ -267,6 +338,13 @@ export default function MapScreen() {
       >
         <Text style={styles.fabMasTxt}>＋</Text>
       </Pressable>
+
+      <FiltroHotspotsSheet
+        initialFilter={filtro}
+        onApply={aplicarFiltro}
+        onDismiss={() => setFiltroVisible(false)}
+        visible={filtroVisible}
+      />
 
       {token ? (
         <NuevoReporteModal
@@ -338,7 +416,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  iconoMenu: { fontSize: 22, color: "#2d3748", fontWeight: "700", marginTop: -2 },
   fabFila: {
     position: "absolute",
     right: 16,
@@ -357,7 +434,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  fabIcono: { fontSize: 22, color: "#2d3748", fontWeight: "700" },
+  fabFilaGap: { gap: 10 },
+  fabActive: { backgroundColor: "#E53E3E" },
+  chipFiltro: {
+    position: "absolute",
+    bottom: 110,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(229,62,62,0.92)",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    zIndex: 2,
+  },
+  chipFiltroTxt: { color: "#fff", fontSize: 12, fontWeight: "600", letterSpacing: 0.3 },
   fabMas: {
     position: "absolute",
     left: 20,
@@ -391,13 +488,4 @@ const styles = StyleSheet.create({
   filaTipo: { fontSize: 15, fontWeight: "700", color: "#E53E3E", textTransform: "capitalize" },
   filaMeta: { fontSize: 12, color: "#718096", marginTop: 2 },
   filaDesc: { fontSize: 14, color: "#2d3748", marginTop: 6 },
-    fabFilaGap: {
-    gap: 10,
-  },
-  fabActive: {
-    backgroundColor: "#E53E3E",
-  },
-  fabActiveIcon: {
-    fontSize: 20,
-  },
 });
