@@ -28,6 +28,7 @@ export default function Header({
   setMes,
   isDark,
   setIsDark,
+  mostrarGravedad = true,
 }) {
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
@@ -49,36 +50,38 @@ export default function Header({
 
       {/* Lado derecho: filtros + toggle */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Filtro Gravedad */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
-            Gravedad
-          </span>
-          <Select
-            className="w-36"
-            placeholder="Gravedad"
-            selectedKey={gravedad}
-            onSelectionChange={(key) => {
-              const val = key instanceof Set ? [...key][0] : key;
-              if (val != null) setGravedad(String(val));
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {GRAVEDADES.map((g) => (
-                  <ListBox.Item key={g} id={g} textValue={g}>
-                    {g}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
+        {/* Filtro Gravedad — oculto en vistas que no lo usan */}
+        {mostrarGravedad && (
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
+              Gravedad
+            </span>
+            <Select
+              className="w-36"
+              placeholder="Gravedad"
+              selectedKey={gravedad}
+              onSelectionChange={(key) => {
+                const val = key instanceof Set ? [...key][0] : key;
+                if (val != null) setGravedad(String(val));
+              }}
+            >
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {GRAVEDADES.map((g) => (
+                    <ListBox.Item key={g} id={g} textValue={g}>
+                      {g}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
+        )}
 
         {/* Filtro Año */}
         <div className="flex items-center gap-2">

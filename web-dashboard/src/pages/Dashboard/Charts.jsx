@@ -33,11 +33,11 @@ export function HourlyChart({ data }) {
           </defs>
           <XAxis dataKey="hora" tick={{ fontSize: 10 }} interval={2} />
           <YAxis hide />
-          <Tooltip formatter={(v) => [`${v}`, 'Accidentes (normalizado)']} />
+          <Tooltip formatter={(v) => [`${v}`, 'Accidentes']} />
           <Area type="monotone" dataKey="valor" stroke="#ef4444" fill="url(#gradHora)" strokeWidth={2} dot={false} />
         </AreaChart>
       </ResponsiveContainer>
-      <p className="text-center text-xs text-slate-400 mt-2">● ACCIDENTES (NORMALIZADO)</p>
+     
     </ChartCard>
   );
 }
