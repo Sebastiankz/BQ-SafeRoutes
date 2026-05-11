@@ -10,7 +10,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   GoogleMap,
-  HeatmapLayer,
   useJsApiLoader,
 } from "@react-google-maps/api";
 
@@ -84,11 +83,22 @@ export default function MapaGoogleMaps({ año, mes, alturaContenedor = "320px" }
   const [cargando, setCargando] = useState(true);
   const [errorFetch, setErrorFetch] = useState(null);
 
+  // Referencias para gestión imperativa del HeatmapLayer
+  const mapRef = useRef(null);
+  const heatmapLayerRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  function onMapLoad(map) {
+    mapRef.current = map;
+    setMapReady(true);
+  }
+
   // Fetch hotspots cuando cambian los filtros (mismo ciclo que cargarHotspots en mobile)
   useEffect(() => {
     let cancelled = false;
     setCargando(true);
     setErrorFetch(null);
+    setHotspots([]); // limpia puntos anteriores antes de que llegue la nueva respuesta
 
     const qs = buildHotspotsQuery(año, mes);
     fetch(`/api/hotspots/?${qs}`)
@@ -109,9 +119,7 @@ export default function MapaGoogleMaps({ año, mes, alturaContenedor = "320px" }
     return () => { cancelled = true; };
   }, [año, mes]);
 
-  // Convierte hotspots a puntos weighted para HeatmapLayer.
-  // Idéntico a heatmapPoints en MapScreen.tsx:
-  //   { latitude: h.latitud, longitude: h.longitud, weight: Math.max(1, h.num_incidentes ?? 1) }
+  // Convierte hotspots a puntos weighted para el HeatmapLayer.
   const heatmapData = useMemo(() => {
     if (!isLoaded || !window.google) return [];
     return hotspots
@@ -121,6 +129,39 @@ export default function MapaGoogleMaps({ año, mes, alturaContenedor = "320px" }
         weight: Math.max(1, h.num_incidentes ?? 1),
       }));
   }, [hotspots, isLoaded]);
+
+  // Gestión imperativa del HeatmapLayer:
+  // Destruye la capa anterior con setMap(null) ANTES de crear la nueva.
+  // Esto garantiza que el canvas de Google Maps se limpie completamente,
+  // independientemente del ciclo de vida de React.
+  useEffect(() => {
+    if (!mapReady || !window.google?.maps?.visualization) return;
+
+    // Destruir capa anterior
+    if (heatmapLayerRef.current) {
+      heatmapLayerRef.current.setMap(null);
+      heatmapLayerRef.current = null;
+    }
+
+    if (heatmapData.length === 0) return;
+
+    // Crear nueva capa con los datos actuales
+    heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer({
+      data: heatmapData,
+      map: mapRef.current,
+      gradient: HEATMAP_GRADIENT,
+      opacity: HEATMAP_OPACITY,
+      radius: HEATMAP_RADIUS,
+      maxIntensity: Math.max(...hotspots.map((h) => h.num_incidentes ?? 1), 1),
+    });
+
+    return () => {
+      if (heatmapLayerRef.current) {
+        heatmapLayerRef.current.setMap(null);
+        heatmapLayerRef.current = null;
+      }
+    };
+  }, [heatmapData, mapReady]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -188,20 +229,8 @@ export default function MapaGoogleMaps({ año, mes, alturaContenedor = "320px" }
           center={BARRANQUILLA_CENTER}
           zoom={DEFAULT_ZOOM}
           options={MAP_OPTIONS}
-        >
-          {heatmapData.length > 0 && (
-            <HeatmapLayer
-              data={heatmapData}
-              options={{
-                gradient: HEATMAP_GRADIENT,
-                opacity: HEATMAP_OPACITY,
-                radius: HEATMAP_RADIUS,
-                // maxIntensity dinámico: el hotspot más denso marca el techo de color
-                maxIntensity: Math.max(...hotspots.map((h) => h.num_incidentes ?? 1), 1),
-              }}
-            />
-          )}
-        </GoogleMap>
+          onLoad={onMapLoad}
+        />
       )}
     </div>
   );
