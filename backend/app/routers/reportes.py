@@ -12,6 +12,8 @@ from ..deps_auth import get_current_usuario_uuid
 from ..models import Reporte
 from ..models.validacion import Validacion
 from ..schemas import ReporteCreate, ReporteOut
+from ..services.reporte_service import reverse_geocode
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,10 @@ def _build_reporte_select():
         Reporte.severidad,
         Reporte.validaciones,
         Reporte.created_at,
+        Reporte.direccion,       # ← nueva
+        Reporte.activo,          # ← nueva
+        Reporte.estado,          # ← nueva
+        Reporte.confirmado_at,   # ← nueva
     )
 
 
@@ -39,6 +45,7 @@ def crear_reporte(
     usuario_id: Annotated[UUID, Depends(get_current_usuario_uuid)],
     db: Session = Depends(get_db),
 ):
+    settings = get_settings()
     reporte = Reporte(
         usuario_id=usuario_id,
         tipo=payload.tipo,
@@ -64,6 +71,11 @@ def crear_reporte(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno al guardar el reporte. Intenta de nuevo.",
         ) from None
+
+    direccion = reverse_geocode(payload.latitud, payload.longitud, settings.GOOGLE_MAPS_API_KEY)
+    if direccion:
+        reporte.direccion = direccion
+        db.commit()
 
     created = (
         db.execute(_build_reporte_select().where(Reporte.id == reporte.id)).mappings().first()

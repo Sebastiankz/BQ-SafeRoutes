@@ -27,3 +27,7 @@ class ReporteOut(BaseModel):
     severidad: int
     validaciones: int
     created_at: datetime
+    direccion: Optional[str] = None
+    activo: bool
+    estado: str
+    confirmado_at: Optional[datetime] = None

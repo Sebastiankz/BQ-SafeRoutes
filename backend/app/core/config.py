@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "*"
     RATE_LIMIT: str = "60/minute"
+    GOOGLE_MAPS_API_KEY: str = ""
 
 
 @lru_cache

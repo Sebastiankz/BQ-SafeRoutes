@@ -3,3 +3,19 @@
 
 /* Habilita dark mode por clase en Tailwind v4 */
 @variant dark (&:where(.dark, .dark *));
+
+/* Animación de entrada para nuevos reportes en el feed */
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-top {
+  animation: slide-in-top 0.35s ease-out forwards;
+}

@@ -1,4 +1,4 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "*"
     RATE_LIMIT: str = "60/minute"
+    GOOGLE_MAPS_API_KEY: str = ""
 
 
 @lru_cache
