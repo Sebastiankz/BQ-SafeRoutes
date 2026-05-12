@@ -16,7 +16,11 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
-import type { CrearReportePayload, Reporte, TipoReporte } from "../services/reportes";
+import type {
+  CrearReportePayload,
+  Reporte,
+  TipoReporte,
+} from "../services/reportes";
 import { crearReporte } from "../services/reportes";
 import { subirFotoReporte } from "../services/storage";
 
@@ -36,8 +40,6 @@ interface Props {
   onCreado: () => void;
   /** JWT del usuario logueado (obligatorio al enviar). */
   accessToken: string;
-  /** UUID del usuario (para nombrar archivo en Storage). */
-  userId: string;
 }
 
 function cerrarTodo(onDismiss: () => void) {
@@ -52,7 +54,6 @@ export default function NuevoReporteModal({
   longitud,
   onCreado,
   accessToken,
-  userId,
 }: Props) {
   const [tipo, setTipo] = useState<TipoReporte>("hueco");
   const [descripcion, setDescripcion] = useState("");
@@ -117,7 +118,7 @@ export default function NuevoReporteModal({
     try {
       let fotoUrl: string | null = null;
       if (fotoUri) {
-        fotoUrl = await subirFotoReporte(fotoUri, userId);
+        fotoUrl = await subirFotoReporte(fotoUri, accessToken);
       }
       const payload: CrearReportePayload = {
         tipo,
@@ -191,7 +192,14 @@ export default function NuevoReporteModal({
                     style={[styles.chip, tipo === t.value && styles.chipActivo]}
                     onPress={() => setTipo(t.value)}
                   >
-                    <Text style={[styles.chipTxt, tipo === t.value && styles.chipTxtActivo]}>{t.label}</Text>
+                    <Text
+                      style={[
+                        styles.chipTxt,
+                        tipo === t.value && styles.chipTxtActivo,
+                      ]}
+                    >
+                      {t.label}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -203,10 +211,20 @@ export default function NuevoReporteModal({
                     key={n}
                     accessibilityRole="button"
                     disabled={guardando}
-                    style={[styles.sevBtn, severidad === n && styles.sevBtnActivo]}
+                    style={[
+                      styles.sevBtn,
+                      severidad === n && styles.sevBtnActivo,
+                    ]}
                     onPress={() => setSeveridad(n)}
                   >
-                    <Text style={[styles.sevTxt, severidad === n && styles.sevTxtActivo]}>{n}</Text>
+                    <Text
+                      style={[
+                        styles.sevTxt,
+                        severidad === n && styles.sevTxtActivo,
+                      ]}
+                    >
+                      {n}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -249,7 +267,11 @@ export default function NuevoReporteModal({
                 )}
               </View>
               {fotoUri && (
-                <Image source={{ uri: fotoUri }} style={styles.preview} resizeMode="cover" />
+                <Image
+                  source={{ uri: fotoUri }}
+                  style={styles.preview}
+                  resizeMode="cover"
+                />
               )}
 
               <Pressable
@@ -329,8 +351,18 @@ const styles = StyleSheet.create({
   },
   btnCerrarTxt: { fontSize: 18, color: "#4a5568", fontWeight: "600" },
   sub: { fontSize: 12, color: "#718096", marginBottom: 16 },
-  etiqueta: { fontSize: 13, fontWeight: "600", color: "#4a5568", marginBottom: 8 },
-  gridTipos: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  etiqueta: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4a5568",
+    marginBottom: 8,
+  },
+  gridTipos: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -363,15 +395,36 @@ const styles = StyleSheet.create({
     color: "#1a202c",
     marginBottom: 8,
   },
-  filaFoto: { flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 10 },
-  btnFoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#edf2f7" },
+  filaFoto: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  btnFoto: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#edf2f7",
+  },
   btnFotoTxt: { fontSize: 13, fontWeight: "600", color: "#2d3748" },
   quitarFoto: { fontSize: 18, color: "#c53030", paddingHorizontal: 6 },
   preview: { width: "100%", height: 140, borderRadius: 10, marginBottom: 10 },
-  btnTeclado: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 4, marginBottom: 12 },
+  btnTeclado: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
   btnTecladoTxt: { fontSize: 15, color: "#2b6cb0", fontWeight: "600" },
   error: { color: "#c53030", fontSize: 13, marginBottom: 12 },
-  acciones: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 6, paddingBottom: 8 },
+  acciones: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 6,
+    paddingBottom: 8,
+  },
   btn: {
     minWidth: 110,
     paddingVertical: 12,

@@ -1,5 +1,7 @@
+import { apiFetch } from "./client";
+
 export async function getReportes(limit = 50, offset = 0) {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/reportes/?limit=${limit}&offset=${offset}`,
   );
   if (!response.ok)

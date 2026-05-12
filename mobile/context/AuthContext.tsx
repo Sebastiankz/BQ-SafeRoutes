@@ -1,12 +1,33 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import type { Session } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
 
-import { supabase, tieneConfigSupabase } from "../lib/supabase";
+import {
+  cerrarSesionBackend,
+  iniciarSesionBackend,
+  obtenerPerfilBackend,
+  refrescarSesionBackend,
+  registrarBackend,
+  type UsuarioSesion,
+} from "../services/auth";
 
-export type UsuarioSesion = {
-  id: string;
-  email: string;
-  nombre: string | null;
+export type { UsuarioSesion } from "../services/auth";
+
+const ACCESS_TOKEN_KEY = "@saferoutes/auth_access_token";
+const REFRESH_TOKEN_KEY = "@saferoutes/auth_refresh_token";
+const USUARIO_KEY = "@saferoutes/auth_usuario";
+
+type SesionPersistida = {
+  accessToken: string;
+  refreshToken: string | null;
+  usuario: UsuarioSesion;
 };
 
 type AuthState = {
@@ -23,94 +44,172 @@ type AuthActions = {
 
 const AuthContext = createContext<(AuthState & AuthActions) | null>(null);
 
-function sesionUsuario(s: Session): UsuarioSesion {
-  const u = s.user;
-  const meta = (u.user_metadata ?? {}) as { full_name?: string };
-  const nombre = typeof meta.full_name === "string" ? meta.full_name.trim() || null : null;
+function normalizarUsuario(raw: unknown): UsuarioSesion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const payload = raw as Partial<UsuarioSesion>;
+  if (typeof payload.id !== "string" || typeof payload.email !== "string")
+    return null;
   return {
-    id: u.id,
-    email: u.email ?? "",
-    nombre,
+    id: payload.id,
+    email: payload.email,
+    nombre: typeof payload.nombre === "string" ? payload.nombre : null,
   };
+}
+
+async function guardarSesion(sesion: SesionPersistida): Promise<void> {
+  const refreshToken = sesion.refreshToken ?? "";
+  await AsyncStorage.multiSet([
+    [ACCESS_TOKEN_KEY, sesion.accessToken],
+    [REFRESH_TOKEN_KEY, refreshToken],
+    [USUARIO_KEY, JSON.stringify(sesion.usuario)],
+  ]);
+}
+
+async function limpiarSesion(): Promise<void> {
+  await AsyncStorage.multiRemove([
+    ACCESS_TOKEN_KEY,
+    REFRESH_TOKEN_KEY,
+    USUARIO_KEY,
+  ]);
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [hydrating, setHydrating] = useState(true);
 
-  const aplicarSesion = useCallback((session: Session | null) => {
-    if (!session?.access_token) {
+  const aplicarSesion = useCallback((sesion: SesionPersistida | null) => {
+    if (!sesion) {
       setToken(null);
+      setRefreshToken(null);
       setUsuario(null);
       return;
     }
-    setToken(session.access_token);
-    setUsuario(sesionUsuario(session));
+    setToken(sesion.accessToken);
+    setRefreshToken(sesion.refreshToken);
+    setUsuario(sesion.usuario);
   }, []);
 
   useEffect(() => {
     let cancelado = false;
 
-    supabase.auth
-      .getSession()
-      .then(({ data: { session }, error }) => {
-        if (cancelado) return;
-        if (error || !session) aplicarSesion(null);
-        else aplicarSesion(session);
-      })
-      .catch(() => {
-        if (!cancelado) aplicarSesion(null);
-      })
-      .finally(() => {
-        if (!cancelado) setHydrating(false);
-      });
+    (async () => {
+      try {
+        const items = await AsyncStorage.multiGet([
+          ACCESS_TOKEN_KEY,
+          REFRESH_TOKEN_KEY,
+          USUARIO_KEY,
+        ]);
+        const fromStorage = Object.fromEntries(items);
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      aplicarSesion(session);
-    });
+        const accessToken = fromStorage[ACCESS_TOKEN_KEY]?.trim() || "";
+        const storedRefresh = fromStorage[REFRESH_TOKEN_KEY]?.trim() || null;
+        const storedUser = fromStorage[USUARIO_KEY]
+          ? normalizarUsuario(JSON.parse(fromStorage[USUARIO_KEY]))
+          : null;
+
+        if (!accessToken) {
+          if (!cancelado) aplicarSesion(null);
+          return;
+        }
+
+        try {
+          const usuarioVigente = await obtenerPerfilBackend(accessToken);
+          const sesionActual: SesionPersistida = {
+            accessToken,
+            refreshToken: storedRefresh,
+            usuario: usuarioVigente,
+          };
+          await guardarSesion(sesionActual);
+          if (!cancelado) aplicarSesion(sesionActual);
+          return;
+        } catch {
+          if (storedRefresh) {
+            try {
+              const refreshed = await refrescarSesionBackend(
+                storedRefresh,
+                "body",
+              );
+              const sesionRefrescada: SesionPersistida = {
+                accessToken: refreshed.access_token,
+                refreshToken: refreshed.refresh_token ?? storedRefresh,
+                usuario: refreshed.usuario ??
+                  storedUser ?? {
+                    id: "",
+                    email: "",
+                    nombre: null,
+                  },
+              };
+              if (
+                !sesionRefrescada.usuario.id ||
+                !sesionRefrescada.usuario.email
+              ) {
+                sesionRefrescada.usuario = await obtenerPerfilBackend(
+                  sesionRefrescada.accessToken,
+                );
+              }
+              await guardarSesion(sesionRefrescada);
+              if (!cancelado) aplicarSesion(sesionRefrescada);
+              return;
+            } catch {
+              // Sigue flujo de limpieza abajo.
+            }
+          }
+        }
+
+        await limpiarSesion();
+        if (!cancelado) aplicarSesion(null);
+      } catch {
+        await limpiarSesion();
+        if (!cancelado) aplicarSesion(null);
+      } finally {
+        if (!cancelado) setHydrating(false);
+      }
+    })();
 
     return () => {
       cancelado = true;
-      listener.subscription.unsubscribe();
     };
   }, [aplicarSesion]);
 
   const iniciarSesion = useCallback(
     async (email: string, password: string) => {
-      if (!tieneConfigSupabase()) throw new Error("Configura EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY.");
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message);
-      aplicarSesion(data.session ?? null);
+      const data = await iniciarSesionBackend(email, password, "body");
+      const sesion: SesionPersistida = {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        usuario: data.usuario,
+      };
+      await guardarSesion(sesion);
+      aplicarSesion(sesion);
     },
     [aplicarSesion],
   );
 
   const registrar = useCallback(
     async (email: string, password: string, nombre: string) => {
-      if (!tieneConfigSupabase()) throw new Error("Configura EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY.");
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: nombre.trim() },
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (!data.session) {
-        throw new Error(
-          "Si Supabase tiene confirmación por correo activada, revisa tu bandeja y confirma antes de iniciar sesión.",
-        );
-      }
-      aplicarSesion(data.session);
+      const data = await registrarBackend(email, password, nombre, "body");
+      const sesion: SesionPersistida = {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        usuario: data.usuario,
+      };
+      await guardarSesion(sesion);
+      aplicarSesion(sesion);
     },
     [aplicarSesion],
   );
 
   const cerrarSesion = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await cerrarSesionBackend(token, "body");
+    } catch {
+      // Ignoramos fallos remotos para no dejar sesión local colgada.
+    }
+    await limpiarSesion();
     aplicarSesion(null);
-  }, [aplicarSesion]);
+  }, [token, aplicarSesion]);
 
   const value = useMemo(
     () =>

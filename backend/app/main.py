@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import get_settings
 from .database import engine, Base, get_db
 from . import models  # noqa: F401
-from .routers import reportes_router, hotspots_router, incidentes_router
+from .routers import reportes_router, hotspots_router, incidentes_router, auth_router, storage_router
 
 settings = get_settings()
 
@@ -31,14 +31,17 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 
 origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+allow_credentials = settings.CORS_ALLOW_CREDENTIALS and "*" not in origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
+app.include_router(storage_router)
 app.include_router(reportes_router)
 app.include_router(hotspots_router)
 app.include_router(incidentes_router)

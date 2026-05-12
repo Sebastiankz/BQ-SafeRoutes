@@ -44,7 +44,9 @@ function alturaBarraEstado(): number {
   return typeof h === "number" && !Number.isNaN(h) ? h : 47;
 }
 
-const tieneClaveGoogleMaps = Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim());
+const tieneClaveGoogleMaps = Boolean(
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim(),
+);
 
 const COLOR_POR_TIPO: Record<string, string> = {
   accidente: "#E53E3E",
@@ -88,16 +90,17 @@ function distanciaHaversine(
 
 export default function MapScreen() {
   const navigation = useNavigation<DrawerNav>();
-  const { token, usuario } = useAuth();
+  const { token } = useAuth();
   const insetSuperior = alturaBarraEstado() + 12;
 
   const mapRef = useRef<MapView>(null);
   const [region, setRegion] = useState(BARRANQUILLA);
   const [cargandoUbicacion, setCargandoUbicacion] = useState(true);
   const [errorUbicacion, setErrorUbicacion] = useState<string | null>(null);
-  const [coordsUsuario, setCoordsUsuario] = useState<{ latitude: number; longitude: number } | null>(
-    null,
-  );
+  const [coordsUsuario, setCoordsUsuario] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [cargandoReportes, setCargandoReportes] = useState(true);
@@ -115,7 +118,9 @@ export default function MapScreen() {
   const animacionPulso = useRef<Animated.CompositeAnimation | null>(null);
 
   // Proximidad: el reporte que está mostrando el prompt y el set de ids ya preguntados.
-  const [vigenciaPendiente, setVigenciaPendiente] = useState<Reporte | null>(null);
+  const [vigenciaPendiente, setVigenciaPendiente] = useState<Reporte | null>(
+    null,
+  );
   const [enviandoVigencia, setEnviandoVigencia] = useState(false);
   const preguntadosRef = useRef<Set<number>>(new Set());
   const watcherRef = useRef<Location.LocationSubscription | null>(null);
@@ -161,7 +166,9 @@ export default function MapScreen() {
   const heatmapPoints = useMemo(
     () =>
       hotspots
-        .filter((h) => Number.isFinite(h.latitud) && Number.isFinite(h.longitud))
+        .filter(
+          (h) => Number.isFinite(h.latitud) && Number.isFinite(h.longitud),
+        )
         .map((h) => ({
           latitude: h.latitud,
           longitude: h.longitud,
@@ -173,12 +180,16 @@ export default function MapScreen() {
   async function obtenerUbicacion() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
-      setErrorUbicacion("Permiso de ubicación denegado. Mostrando ubicación predeterminada.");
+      setErrorUbicacion(
+        "Permiso de ubicación denegado. Mostrando ubicación predeterminada.",
+      );
       setCargandoUbicacion(false);
       setCoordsUsuario(null);
       return;
     }
-    const ubicacion = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+    const ubicacion = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Highest,
+    });
     const lat = ubicacion.coords.latitude;
     const lng = ubicacion.coords.longitude;
     setCoordsUsuario({ latitude: lat, longitude: lng });
@@ -272,7 +283,12 @@ export default function MapScreen() {
           const cercano = reportesRef.current.find((r) => {
             if (r.estado !== "confirmado") return false;
             if (preguntadosRef.current.has(r.id)) return false;
-            const d = distanciaHaversine(latitude, longitude, r.latitud, r.longitud);
+            const d = distanciaHaversine(
+              latitude,
+              longitude,
+              r.latitud,
+              r.longitud,
+            );
             return d <= RADIO_PROXIMIDAD_METROS;
           });
 
@@ -322,10 +338,17 @@ export default function MapScreen() {
 
   function pulsarNuevoReporte() {
     if (!token) {
-      Alert.alert("Inicia sesión", "Solo usuarios registrados pueden crear reportes en el mapa.", [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Ir a Mi cuenta", onPress: () => navigation.navigate("MiCuenta") },
-      ]);
+      Alert.alert(
+        "Inicia sesión",
+        "Solo usuarios registrados pueden crear reportes en el mapa.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Ir a Mi cuenta",
+            onPress: () => navigation.navigate("MiCuenta"),
+          },
+        ],
+      );
       return;
     }
     setModalNuevo(true);
@@ -361,8 +384,14 @@ export default function MapScreen() {
 
       {modoSeguroActivo && (
         <View style={styles.bannerModoSeguro}>
-          <MaterialCommunityIcons color="#16a34a" name="shield-check" size={15} />
-          <Text style={styles.bannerModoSeguroTxt}>Modo Seguro activo – monitoreando</Text>
+          <MaterialCommunityIcons
+            color="#16a34a"
+            name="shield-check"
+            size={15}
+          />
+          <Text style={styles.bannerModoSeguroTxt}>
+            Modo Seguro activo – monitoreando
+          </Text>
         </View>
       )}
 
@@ -370,7 +399,9 @@ export default function MapScreen() {
         <View style={[styles.badgeCarga, { top: insetSuperior }]}>
           <ActivityIndicator size="small" color="#E53E3E" />
           <Text style={styles.badgeCargaTxt}>
-            {cargandoHotspots ? "Cargando puntos criticos…" : "Cargando reportes…"}
+            {cargandoHotspots
+              ? "Cargando puntos criticos…"
+              : "Cargando reportes…"}
           </Text>
         </View>
       )}
@@ -381,21 +412,31 @@ export default function MapScreen() {
           keyboardShouldPersistTaps="handled"
           style={styles.mapa}
         >
-          <Text style={styles.listaSinMapaTitulo}>Google Maps sin configurar</Text>
+          <Text style={styles.listaSinMapaTitulo}>
+            Google Maps sin configurar
+          </Text>
           <Text style={styles.listaSinMapaTxt}>
             En <Text style={styles.mono}>mobile/.env</Text> define{" "}
-            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_MAPS_KEY</Text> con una clave de Google Cloud con{" "}
-            <Text style={styles.bold}>Maps SDK for Android</Text> e <Text style={styles.bold}>Maps SDK for iOS</Text>{" "}
-            habilitados para este proyecto. Reinicia Expo con <Text style={styles.mono}>npx expo start -c</Text>.
+            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_MAPS_KEY</Text> con una
+            clave de Google Cloud con{" "}
+            <Text style={styles.bold}>Maps SDK for Android</Text> e{" "}
+            <Text style={styles.bold}>Maps SDK for iOS</Text> habilitados para
+            este proyecto. Reinicia Expo con{" "}
+            <Text style={styles.mono}>npx expo start -c</Text>.
           </Text>
-          <Text style={styles.listaSinMapaSub}>Reportes cargados ({reportes.length})</Text>
+          <Text style={styles.listaSinMapaSub}>
+            Reportes cargados ({reportes.length})
+          </Text>
           {reportes.map((r) => (
             <View key={r.id} style={styles.filaRepo}>
               <Text style={styles.filaTipo}>{r.tipo}</Text>
               <Text style={styles.filaMeta}>
-                sev. {r.severidad} · {r.latitud.toFixed(4)}, {r.longitud.toFixed(4)}
+                sev. {r.severidad} · {r.latitud.toFixed(4)},{" "}
+                {r.longitud.toFixed(4)}
               </Text>
-              {r.descripcion ? <Text style={styles.filaDesc}>{r.descripcion}</Text> : null}
+              {r.descripcion ? (
+                <Text style={styles.filaDesc}>{r.descripcion}</Text>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -409,15 +450,16 @@ export default function MapScreen() {
           showsMyLocationButton
           showsUserLocation
         >
-          {!heatmapMode && reportes.map((r) => (
-            <Marker
-              key={r.id}
-              coordinate={{ latitude: r.latitud, longitude: r.longitud }}
-              description={r.descripcion ?? undefined}
-              pinColor={COLOR_POR_TIPO[r.tipo] ?? "#E53E3E"}
-              title={`${r.tipo} · sev. ${r.severidad}`}
-            />
-          ))}
+          {!heatmapMode &&
+            reportes.map((r) => (
+              <Marker
+                key={r.id}
+                coordinate={{ latitude: r.latitud, longitude: r.longitud }}
+                description={r.descripcion ?? undefined}
+                pinColor={COLOR_POR_TIPO[r.tipo] ?? "#E53E3E"}
+                title={`${r.tipo} · sev. ${r.severidad}`}
+              />
+            ))}
 
           {heatmapMode && heatmapPoints.length > 0 && (
             <Heatmap
@@ -455,7 +497,9 @@ export default function MapScreen() {
         </Pressable>
 
         <Pressable
-          accessibilityLabel={heatmapMode ? "Ocultar puntos criticos" : "Mostrar puntos criticos"}
+          accessibilityLabel={
+            heatmapMode ? "Ocultar puntos criticos" : "Mostrar puntos criticos"
+          }
           accessibilityRole="button"
           accessibilityState={{ selected: heatmapMode }}
           style={[styles.fab, heatmapMode && styles.fabActive]}
@@ -484,13 +528,19 @@ export default function MapScreen() {
 
       {heatmapMode && (
         <View style={styles.chipFiltro} pointerEvents="none">
-          <MaterialCommunityIcons color="#fff" name="filter-variant" size={14} />
+          <MaterialCommunityIcons
+            color="#fff"
+            name="filter-variant"
+            size={14}
+          />
           <Text style={styles.chipFiltroTxt}>{etiquetaFiltro(filtro)}</Text>
         </View>
       )}
 
       <Pressable
-        accessibilityLabel={token ? "Nuevo reporte" : "Nuevo reporte (requiere cuenta)"}
+        accessibilityLabel={
+          token ? "Nuevo reporte" : "Nuevo reporte (requiere cuenta)"
+        }
         accessibilityRole="button"
         style={[styles.fabMas, !token && styles.fabMasInvitado]}
         onPress={pulsarNuevoReporte}
@@ -508,7 +558,6 @@ export default function MapScreen() {
       {token ? (
         <NuevoReporteModal
           accessToken={token}
-          userId={usuario?.id ?? ""}
           latitud={ubicacionParaReporte.latitud}
           longitud={ubicacionParaReporte.longitud}
           onCreado={() => void cargarReportes()}
@@ -525,12 +574,20 @@ export default function MapScreen() {
       />
 
       {/* ── Botón Modo Seguro ────────────────────────────────────────────── */}
-      <Animated.View pointerEvents="box-none" style={[styles.modoSeguroWrap, { transform: [{ scale: pulso }] }]}>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.modoSeguroWrap, { transform: [{ scale: pulso }] }]}
+      >
         <Pressable
-          accessibilityLabel={modoSeguroActivo ? "Desactivar Modo Seguro" : "Activar Modo Seguro"}
+          accessibilityLabel={
+            modoSeguroActivo ? "Desactivar Modo Seguro" : "Activar Modo Seguro"
+          }
           accessibilityRole="button"
           accessibilityState={{ selected: modoSeguroActivo }}
-          style={[styles.modoSeguroBtn, modoSeguroActivo && styles.modoSeguroBtnActivo]}
+          style={[
+            styles.modoSeguroBtn,
+            modoSeguroActivo && styles.modoSeguroBtnActivo,
+          ]}
           onPress={toggleModoSeguro}
         >
           <MaterialCommunityIcons
@@ -638,7 +695,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     zIndex: 2,
   },
-  chipFiltroTxt: { color: "#fff", fontSize: 12, fontWeight: "600", letterSpacing: 0.3 },
+  chipFiltroTxt: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
   fabMas: {
     position: "absolute",
     left: 20,
@@ -661,15 +723,31 @@ const styles = StyleSheet.create({
   listaSinMapaContenido: { padding: 16, paddingBottom: 120, gap: 8 },
   listaSinMapaTitulo: { fontSize: 18, fontWeight: "700", color: "#1a202c" },
   listaSinMapaTxt: { fontSize: 14, color: "#4a5568", lineHeight: 20 },
-  listaSinMapaSub: { fontSize: 15, fontWeight: "600", color: "#2d3748", marginTop: 12 },
-  mono: { fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }) },
+  listaSinMapaSub: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#2d3748",
+    marginTop: 12,
+  },
+  mono: {
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      default: "monospace",
+    }),
+  },
   bold: { fontWeight: "700" },
   filaRepo: {
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#e2e8f0",
   },
-  filaTipo: { fontSize: 15, fontWeight: "700", color: "#E53E3E", textTransform: "capitalize" },
+  filaTipo: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#E53E3E",
+    textTransform: "capitalize",
+  },
   filaMeta: { fontSize: 12, color: "#718096", marginTop: 2 },
   filaDesc: { fontSize: 14, color: "#2d3748", marginTop: 6 },
   bannerModoSeguro: {
