@@ -4,6 +4,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Alert,
   NativeModules,
   Platform,
@@ -85,6 +87,41 @@ export default function MapScreen() {
   const [filtroVisible, setFiltroVisible] = useState(false);
   const [filtro, setFiltro] = useState<HotspotFilter>({ mode: "global" });
   const [cargandoHotspots, setCargandoHotspots] = useState(false);
+
+  // ── Modo Seguro ────────────────────────────────────────────────────────────
+  const [modoSeguroActivo, setModoSeguroActivo] = useState(false);
+  const pulso = useRef(new Animated.Value(1)).current;
+  const animacionPulso = useRef<Animated.CompositeAnimation | null>(null);
+
+  function toggleModoSeguro() {
+    setModoSeguroActivo((prev) => {
+      const siguiente = !prev;
+      if (siguiente) {
+        animacionPulso.current = Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulso, {
+              toValue: 1.06,
+              duration: 700,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulso, {
+              toValue: 1,
+              duration: 700,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+        animacionPulso.current.start();
+      } else {
+        animacionPulso.current?.stop();
+        pulso.setValue(1);
+      }
+      // TODO (compañero): aquí conectas watchPositionAsync y onProximidad(hotspot)
+      return siguiente;
+    });
+  }
 
   const debeMostrarListaSinGoogleMaps = !tieneClaveGoogleMaps;
 
@@ -207,6 +244,14 @@ export default function MapScreen() {
           <Text style={styles.bannerErrorTexto}>{errorReportes}</Text>
         </View>
       )}
+
+      {modoSeguroActivo && (
+        <View style={styles.bannerModoSeguro}>
+          <MaterialCommunityIcons color="#16a34a" name="shield-check" size={15} />
+          <Text style={styles.bannerModoSeguroTxt}>Modo Seguro activo – monitoreando</Text>
+        </View>
+      )}
+
       {(cargandoReportes || cargandoHotspots) && !errorReportes && (
         <View style={[styles.badgeCarga, { top: insetSuperior }]}>
           <ActivityIndicator size="small" color="#E53E3E" />
@@ -357,6 +402,24 @@ export default function MapScreen() {
           visible={modalNuevo}
         />
       ) : null}
+
+      {/* ── Botón Modo Seguro ────────────────────────────────────────────── */}
+      <Animated.View style={[styles.modoSeguroWrap, { transform: [{ scale: pulso }] }]}>
+        <Pressable
+          accessibilityLabel={modoSeguroActivo ? "Desactivar Modo Seguro" : "Activar Modo Seguro"}
+          accessibilityRole="button"
+          accessibilityState={{ selected: modoSeguroActivo }}
+          style={[styles.modoSeguroBtn, modoSeguroActivo && styles.modoSeguroBtnActivo]}
+          onPress={toggleModoSeguro}
+        >
+          <MaterialCommunityIcons
+            color="#fff"
+            name={modoSeguroActivo ? "shield-check" : "shield-outline"}
+            size={20}
+          />
+          <Text style={styles.modoSeguroTxt}>MODO SEGURO</Text>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -488,4 +551,46 @@ const styles = StyleSheet.create({
   filaTipo: { fontSize: 15, fontWeight: "700", color: "#E53E3E", textTransform: "capitalize" },
   filaMeta: { fontSize: 12, color: "#718096", marginTop: 2 },
   filaDesc: { fontSize: 14, color: "#2d3748", marginTop: 6 },
+  bannerModoSeguro: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#f0fdf4",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#bbf7d0",
+  },
+  bannerModoSeguroTxt: { color: "#15803d", fontSize: 13, fontWeight: "600" },
+  modoSeguroWrap: {
+    position: "absolute",
+    bottom: 36,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 4,
+  },
+  modoSeguroBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: "#1a202c",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  modoSeguroBtnActivo: {
+    backgroundColor: "#16a34a",
+  },
+  modoSeguroTxt: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
 });
