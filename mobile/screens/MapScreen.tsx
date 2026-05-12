@@ -21,12 +21,13 @@ import * as Location from "expo-location";
 
 import FiltroHotspotsSheet from "../components/FiltroHotspotsSheet";
 import NuevoReporteModal from "../components/NuevoReporteModal";
+import VigenciaModal from "../components/VigenciaModal";
 import { useAuth } from "../context/AuthContext";
 import type { RootDrawerParamList } from "../navigation/types";
 import type { Hotspot, HotspotFilter } from "../services/hotspots";
 import { listarHotspots } from "../services/hotspots";
 import type { Reporte } from "../services/reportes";
-import { listarReportes } from "../services/reportes";
+import { listarReportes, responderVigencia } from "../services/reportes";
 
 type DrawerNav = DrawerNavigationProp<RootDrawerParamList>;
 
@@ -65,6 +66,26 @@ function etiquetaFiltro(f: HotspotFilter): string {
   return `${String(f.month).padStart(2, "0")}/${f.year}`;
 }
 
+const RADIO_PROXIMIDAD_METROS = 80;
+const INTERVALO_UBICACION_MS = 8000;
+const DISTANCIA_MINIMA_MOVIMIENTO_M = 20;
+
+function distanciaHaversine(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371000;
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLon = rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 export default function MapScreen() {
   const navigation = useNavigation<DrawerNav>();
   const { token, usuario } = useAuth();
@@ -93,6 +114,13 @@ export default function MapScreen() {
   const pulso = useRef(new Animated.Value(1)).current;
   const animacionPulso = useRef<Animated.CompositeAnimation | null>(null);
 
+  // Proximidad: el reporte que está mostrando el prompt y el set de ids ya preguntados.
+  const [vigenciaPendiente, setVigenciaPendiente] = useState<Reporte | null>(null);
+  const [enviandoVigencia, setEnviandoVigencia] = useState(false);
+  const preguntadosRef = useRef<Set<number>>(new Set());
+  const watcherRef = useRef<Location.LocationSubscription | null>(null);
+  const reportesRef = useRef<Reporte[]>([]);
+
   function toggleModoSeguro() {
     setModoSeguroActivo((prev) => {
       const siguiente = !prev;
@@ -118,7 +146,6 @@ export default function MapScreen() {
         animacionPulso.current?.stop();
         pulso.setValue(1);
       }
-      // TODO (compañero): aquí conectas watchPositionAsync y onProximidad(hotspot)
       return siguiente;
     });
   }
@@ -205,6 +232,93 @@ export default function MapScreen() {
       void cargarHotspots(filtro);
     }
   }, [cargandoUbicacion, cargarReportes, cargarHotspots, filtro]);
+
+  // Mantener un ref con la lista actual para que el watcher (cuyo closure no se
+  // rerenderiza) siempre vea reportes frescos al evaluar proximidad.
+  useEffect(() => {
+    reportesRef.current = reportes;
+  }, [reportes]);
+
+  // Watcher de proximidad: solo corre con Modo Seguro encendido y mientras el
+  // usuario tenga sesión (la respuesta al prompt necesita JWT).
+  useEffect(() => {
+    if (!modoSeguroActivo || !token) {
+      watcherRef.current?.remove();
+      watcherRef.current = null;
+      preguntadosRef.current.clear();
+      setVigenciaPendiente(null);
+      return;
+    }
+
+    let cancelado = false;
+
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted" || cancelado) return;
+
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: INTERVALO_UBICACION_MS,
+          distanceInterval: DISTANCIA_MINIMA_MOVIMIENTO_M,
+        },
+        (loc) => {
+          const { latitude, longitude } = loc.coords;
+          setCoordsUsuario({ latitude, longitude });
+
+          // Si ya hay un prompt abierto, no abrimos otro encima.
+          if (vigenciaPendiente !== null) return;
+
+          const cercano = reportesRef.current.find((r) => {
+            if (r.estado !== "confirmado") return false;
+            if (preguntadosRef.current.has(r.id)) return false;
+            const d = distanciaHaversine(latitude, longitude, r.latitud, r.longitud);
+            return d <= RADIO_PROXIMIDAD_METROS;
+          });
+
+          if (cercano) {
+            preguntadosRef.current.add(cercano.id);
+            setVigenciaPendiente(cercano);
+          }
+        },
+      );
+
+      if (cancelado) {
+        subscription.remove();
+        return;
+      }
+      watcherRef.current = subscription;
+    })();
+
+    return () => {
+      cancelado = true;
+      watcherRef.current?.remove();
+      watcherRef.current = null;
+    };
+  }, [modoSeguroActivo, token, vigenciaPendiente]);
+
+  const cerrarVigencia = useCallback(() => {
+    setVigenciaPendiente(null);
+  }, []);
+
+  const onResponderVigencia = useCallback(
+    async (sigue: boolean) => {
+      if (!vigenciaPendiente || !token) return;
+      setEnviandoVigencia(true);
+      try {
+        await responderVigencia(vigenciaPendiente.id, sigue, token);
+        // Si el reporte pudo haber cambiado de estado, refrescamos la lista.
+        await cargarReportes();
+      } catch (e) {
+        const mensaje = e instanceof Error ? e.message : String(e);
+        Alert.alert("No se pudo registrar tu respuesta", mensaje);
+      } finally {
+        setEnviandoVigencia(false);
+        setVigenciaPendiente(null);
+      }
+    },
+    [vigenciaPendiente, token, cargarReportes],
+  );
 
   function pulsarNuevoReporte() {
     if (!token) {
@@ -403,8 +517,15 @@ export default function MapScreen() {
         />
       ) : null}
 
+      <VigenciaModal
+        enviando={enviandoVigencia}
+        onDismiss={cerrarVigencia}
+        onResponder={onResponderVigencia}
+        reporte={vigenciaPendiente}
+      />
+
       {/* ── Botón Modo Seguro ────────────────────────────────────────────── */}
-      <Animated.View style={[styles.modoSeguroWrap, { transform: [{ scale: pulso }] }]}>
+      <Animated.View pointerEvents="box-none" style={[styles.modoSeguroWrap, { transform: [{ scale: pulso }] }]}>
         <Pressable
           accessibilityLabel={modoSeguroActivo ? "Desactivar Modo Seguro" : "Activar Modo Seguro"}
           accessibilityRole="button"
