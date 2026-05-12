@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 TipoReporte = Literal["accidente", "hueco", "arroyo", "semaforo_danado", "otro"]
+EstadoReporte = Literal["pendiente", "confirmado", "inactivo"]
 
 
 class ReporteCreate(BaseModel):
@@ -26,4 +27,17 @@ class ReporteOut(BaseModel):
     longitud: float
     severidad: int
     validaciones: int
+    estado: EstadoReporte
+    activo: bool
+    reporte_padre_id: Optional[int] = None
     created_at: datetime
+
+
+# Para endpoints de validación
+class VigenciaIn(BaseModel):
+    sigue: bool
+
+class VigenciaOut(BaseModel):
+    reporte_id: int
+    estado: EstadoReporte
+    activo: bool

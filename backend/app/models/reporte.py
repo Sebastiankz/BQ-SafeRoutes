@@ -22,3 +22,4 @@ class Reporte(Base):
     confirmado_at = Column(DateTime(timezone=True), nullable=True)
     inactivado_at = Column(DateTime(timezone=True), nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    direccion   = Column(Text, nullable=True) 
