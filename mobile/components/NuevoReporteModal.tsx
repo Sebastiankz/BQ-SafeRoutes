@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -15,7 +16,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
-import type { CrearReportePayload, TipoReporte } from "../services/reportes";
+import type { CrearReportePayload, Reporte, TipoReporte } from "../services/reportes";
 import { crearReporte } from "../services/reportes";
 import { subirFotoReporte } from "../services/storage";
 
@@ -91,6 +92,24 @@ export default function NuevoReporteModal({
     }
   }
 
+  function mostrarFeedback(reporte: Reporte) {
+    if (reporte.reporte_padre_id !== null) {
+      Alert.alert(
+        "¡Gracias por confirmar!",
+        "Tu reporte se sumó a otro cercano del mismo tipo y ayuda a validarlo. Cuando tres usuarios coincidan, será visible en el mapa.",
+      );
+      return;
+    }
+    if (reporte.estado === "pendiente") {
+      Alert.alert(
+        "Reporte en revisión",
+        "Tu reporte fue registrado y está en revisión. Será visible en el mapa cuando otros usuarios reporten lo mismo cerca.",
+      );
+      return;
+    }
+    Alert.alert("Reporte creado", "Tu reporte ya está visible en el mapa.");
+  }
+
   async function enviar() {
     Keyboard.dismiss();
     setGuardando(true);
@@ -108,11 +127,12 @@ export default function NuevoReporteModal({
         longitud,
         severidad,
       };
-      await crearReporte(payload, accessToken);
+      const reporte = await crearReporte(payload, accessToken);
       setDescripcion("");
       setFotoUri(null);
       onCreado();
       onDismiss();
+      mostrarFeedback(reporte);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

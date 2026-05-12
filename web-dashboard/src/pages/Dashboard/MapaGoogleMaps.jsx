@@ -180,6 +180,7 @@ export default function MapaGoogleMaps({
     setCargando(true);
     setErrorFetch(null);
     setHotspots([]); // limpia puntos anteriores antes de que llegue la nueva respuesta
+    setHotspots([]); // limpia puntos anteriores antes de que llegue la nueva respuesta
 
     const qs = buildHotspotsQuery(año, mes);
     fetch(`/api/hotspots/?${qs}`)
@@ -202,6 +203,7 @@ export default function MapaGoogleMaps({
     };
   }, [año, mes]);
 
+  // Convierte hotspots a puntos weighted para el HeatmapLayer.
   // Convierte hotspots a puntos weighted para el HeatmapLayer.
   const heatmapData = useMemo(() => {
     if (!isLoaded || !window.google) return [];
@@ -410,6 +412,8 @@ export default function MapaGoogleMaps({
           center={BARRANQUILLA_CENTER}
           zoom={DEFAULT_ZOOM}
           options={MAP_OPTIONS}
+          onLoad={onMapLoad}
+        />
           onLoad={onMapLoad}
         />
       )}

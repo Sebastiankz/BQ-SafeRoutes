@@ -1,29 +1,118 @@
-﻿import logging
-import googlemaps
+"""Lógica de consenso comunitario para reportes.
 
-logger = logging.getLogger(__name__)
+Define los umbrales y las operaciones que mueven un reporte entre
+los tres estados: pendiente -> confirmado -> inactivo.
+"""
 
-BBOX = {
-    "lat_min": 10.92, "lat_max": 11.05,
-    "lng_min": -74.86, "lng_max": -74.74,
-}
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+from uuid import UUID
+
+from sqlalchemy import cast, func, select
+from sqlalchemy.orm import Session
+from geoalchemy2 import Geography
+
+from ..models.reporte import Reporte
+from ..models.validacion import Validacion
 
 
-def reverse_geocode(lat: float, lng: float, api_key: str) -> str | None:
-    if not api_key:
-        return None
-    try:
-        gmaps = googlemaps.Client(key=api_key)
-        results = gmaps.reverse_geocode((lat, lng))
-        if not results:
-            return None
-        location = results[0]["geometry"]["location"]
-        if not (
-            BBOX["lat_min"] <= location["lat"] <= BBOX["lat_max"]
-            and BBOX["lng_min"] <= location["lng"] <= BBOX["lng_max"]
-        ):
-            return None
-        return results[0]["formatted_address"]
-    except Exception as e:
-        logger.warning("Reverse geocoding fallo para (%s, %s): %s", lat, lng, e)
-        return None
+# --- Parámetros del consenso ---------------------------------------------
+RADIO_AGRUPACION_METROS = 100.0
+VENTANA_AGRUPACION_HORAS = 24
+UMBRAL_CONFIRMACION = 2          # +2 confirmaciones (3 reportes en total) -> confirmado
+UMBRAL_INACTIVACION = 3          # 3 'proximidad_no' consecutivos -> inactivo
+
+
+def buscar_reporte_padre(
+    db: Session,
+    tipo: str,
+    latitud: float,
+    longitud: float,
+) -> Optional[Reporte]:
+    """Devuelve un reporte 'padre' candidato si existe.
+
+    Criterios: mismo `tipo`, dentro de RADIO_AGRUPACION_METROS, creado dentro
+    de la ventana de horas, no inactivo, y que él mismo no sea hijo de otro.
+    """
+    punto = func.ST_SetSRID(func.ST_MakePoint(longitud, latitud), 4326)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=VENTANA_AGRUPACION_HORAS)
+
+    stmt = (
+        select(Reporte)
+        .where(
+            Reporte.tipo == tipo,
+            Reporte.estado.in_(("pendiente", "confirmado")),
+            Reporte.reporte_padre_id.is_(None),
+            Reporte.created_at >= cutoff,
+            func.ST_DWithin(
+                cast(Reporte.ubicacion, Geography),
+                cast(punto, Geography),
+                RADIO_AGRUPACION_METROS,
+            ),
+        )
+        .order_by(Reporte.created_at.desc())
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def registrar_confirmacion(db: Session, padre: Reporte, usuario_id: UUID) -> Reporte:
+    """Registra una confirmación sobre el padre y promueve a 'confirmado' si toca.
+
+    No hace commit; el caller lo gestiona.
+    """
+    db.add(Validacion(
+        reporte_id=padre.id,
+        usuario_id=usuario_id,
+        tipo="confirmacion_nuevo_reporte",
+    ))
+    padre.validaciones = (padre.validaciones or 0) + 1
+
+    if padre.estado == "pendiente" and padre.validaciones >= UMBRAL_CONFIRMACION:
+        padre.estado = "confirmado"
+        padre.activo = True
+        padre.confirmado_at = func.now()
+
+    return padre
+
+
+def registrar_vigencia(
+    db: Session,
+    reporte: Reporte,
+    usuario_id: UUID,
+    sigue: bool,
+) -> Reporte:
+    """Registra una respuesta de proximidad y desactiva si hay 3 'no' consecutivos.
+
+    No hace commit; el caller lo gestiona.
+    """
+    tipo_voto = "proximidad_si" if sigue else "proximidad_no"
+    db.add(Validacion(
+        reporte_id=reporte.id,
+        usuario_id=usuario_id,
+        tipo=tipo_voto,
+    ))
+
+    db.flush()  # asegura que el voto recién insertado entre en el SELECT
+    ultimos = db.execute(
+        select(Validacion.tipo)
+        .where(
+            Validacion.reporte_id == reporte.id,
+            Validacion.tipo.in_(("proximidad_si", "proximidad_no")),
+        )
+        .order_by(Validacion.created_at.desc(), Validacion.id.desc())
+        .limit(UMBRAL_INACTIVACION)
+    ).scalars().all()
+
+    if (
+        reporte.estado == "confirmado"
+        and len(ultimos) == UMBRAL_INACTIVACION
+        and all(v == "proximidad_no" for v in ultimos)
+    ):
+        reporte.estado = "inactivo"
+        reporte.activo = False
+        reporte.inactivado_at = func.now()
+
+    return reporte
