@@ -41,10 +41,8 @@ def _build_reporte_select():
         Reporte.activo,
         Reporte.reporte_padre_id,
         Reporte.created_at,
-        Reporte.direccion,       # ← nueva
-        Reporte.activo,          # ← nueva
-        Reporte.estado,          # ← nueva
-        Reporte.confirmado_at,   # ← nueva
+        Reporte.direccion,
+        Reporte.confirmado_at,
     )
 
 

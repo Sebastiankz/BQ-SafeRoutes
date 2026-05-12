@@ -6,9 +6,13 @@ los tres estados: pendiente -> confirmado -> inactivo.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
+from urllib.request import urlopen
+from urllib.parse import urlencode
+import json
 
 from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session
@@ -16,6 +20,29 @@ from geoalchemy2 import Geography
 
 from ..models.reporte import Reporte
 from ..models.validacion import Validacion
+
+_geo_logger = logging.getLogger(__name__)
+
+
+def reverse_geocode(latitud: float, longitud: float, api_key: str) -> Optional[str]:
+    """Convierte coordenadas en una dirección legible usando Google Maps Geocoding API.
+
+    Retorna None si no hay API key, si falla la petición o si no hay resultados.
+    No lanza excepciones — el caller no debe verse afectado por un error de geocodificación.
+    """
+    if not api_key:
+        return None
+    try:
+        params = urlencode({"latlng": f"{latitud},{longitud}", "key": api_key, "language": "es"})
+        url = f"https://maps.googleapis.com/maps/api/geocode/json?{params}"
+        with urlopen(url, timeout=3) as resp:
+            data = json.loads(resp.read().decode())
+        results = data.get("results", [])
+        if results:
+            return results[0].get("formatted_address")
+    except Exception as exc:  # noqa: BLE001
+        _geo_logger.warning("reverse_geocode falló: %s", exc)
+    return None
 
 
 # --- Parámetros del consenso ---------------------------------------------

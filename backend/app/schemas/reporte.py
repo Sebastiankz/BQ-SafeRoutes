@@ -32,6 +32,7 @@ class ReporteOut(BaseModel):
     reporte_padre_id: Optional[int] = None
     created_at: datetime
     direccion: Optional[str] = None
+    confirmado_at: Optional[datetime] = None
 
 # Para endpoints de validación
 class VigenciaIn(BaseModel):

@@ -8,5 +8,6 @@ PyJWT[crypto]>=2.8.0
 slowapi>=0.1.9
 pydantic-settings>=2.0.0
 
-# DBSCAN
+# DBSCAN / ML
 scikit-learn==1.5.0
+numpy>=1.24.0
