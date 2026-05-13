@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type {
   CrearReportePayload,
@@ -23,6 +24,7 @@ import type {
 } from "../services/reportes";
 import { crearReporte } from "../services/reportes";
 import { subirFotoReporte } from "../services/storage";
+import { colors, iosTitleFont, radii, shadow } from "../theme/tokens";
 
 const TIPOS: { value: TipoReporte; label: string }[] = [
   { value: "accidente", label: "Accidente" },
@@ -168,7 +170,11 @@ export default function NuevoReporteModal({
                 style={styles.btnCerrar}
                 onPress={() => cerrarTodo(onDismiss)}
               >
-                <Text style={styles.btnCerrarTxt}>✕</Text>
+                <MaterialCommunityIcons
+                  color={colors.textMuted}
+                  name="close"
+                  size={20}
+                />
               </Pressable>
             </View>
             <Text style={styles.sub}>
@@ -318,7 +324,7 @@ export default function NuevoReporteModal({
 const styles = StyleSheet.create({
   fondo: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   kav: {
@@ -326,9 +332,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   tarjeta: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: Platform.select({ ios: 28, android: 20, default: 24 }),
@@ -340,21 +348,27 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  titulo: { fontSize: 20, fontWeight: "700", color: "#1a202c", flex: 1 },
+  titulo: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
+    flex: 1,
+    fontFamily: iosTitleFont,
+    letterSpacing: 0.25,
+  },
   btnCerrar: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 20,
-    backgroundColor: "#edf2f7",
+    backgroundColor: colors.surfaceMuted,
   },
-  btnCerrarTxt: { fontSize: 18, color: "#4a5568", fontWeight: "600" },
-  sub: { fontSize: 12, color: "#718096", marginBottom: 16 },
+  sub: { fontSize: 12, color: colors.textMuted, marginBottom: 16 },
   etiqueta: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#4a5568",
+    fontWeight: "700",
+    color: colors.textMuted,
     marginBottom: 8,
   },
   gridTipos: {
@@ -367,33 +381,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#edf2f7",
+    backgroundColor: colors.surfaceMuted,
   },
-  chipActivo: { backgroundColor: "#E53E3E" },
-  chipTxt: { fontSize: 13, color: "#2d3748" },
+  chipActivo: { backgroundColor: colors.primary },
+  chipTxt: { fontSize: 13, color: colors.text },
   chipTxtActivo: { color: "#fff", fontWeight: "600" },
   filaSev: { flexDirection: "row", gap: 10, marginBottom: 14 },
   sevBtn: {
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#edf2f7",
+    backgroundColor: colors.surfaceMuted,
   },
-  sevBtnActivo: { backgroundColor: "#2c5282" },
-  sevTxt: { fontSize: 16, fontWeight: "600", color: "#4a5568" },
+  sevBtnActivo: { backgroundColor: colors.accent },
+  sevTxt: { fontSize: 16, fontWeight: "700", color: colors.textMuted },
   sevTxtActivo: { color: "#fff" },
   input: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
     padding: 12,
     fontSize: 15,
     minHeight: 80,
     textAlignVertical: "top",
-    color: "#1a202c",
+    color: colors.text,
     marginBottom: 8,
+    backgroundColor: colors.surfaceMuted,
   },
   filaFoto: {
     flexDirection: "row",
@@ -404,20 +419,37 @@ const styles = StyleSheet.create({
   btnFoto: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#edf2f7",
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  btnFotoTxt: { fontSize: 13, fontWeight: "600", color: "#2d3748" },
-  quitarFoto: { fontSize: 18, color: "#c53030", paddingHorizontal: 6 },
-  preview: { width: "100%", height: 140, borderRadius: 10, marginBottom: 10 },
+  btnFotoTxt: { fontSize: 13, fontWeight: "700", color: colors.text },
+  quitarFoto: { fontSize: 18, color: colors.danger, paddingHorizontal: 6 },
+  preview: {
+    width: "100%",
+    height: 140,
+    borderRadius: radii.sm,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   btnTeclado: {
     alignSelf: "flex-start",
     paddingVertical: 8,
     paddingHorizontal: 4,
     marginBottom: 12,
   },
-  btnTecladoTxt: { fontSize: 15, color: "#2b6cb0", fontWeight: "600" },
-  error: { color: "#c53030", fontSize: 13, marginBottom: 12 },
+  btnTecladoTxt: { fontSize: 15, color: colors.primaryDark, fontWeight: "700" },
+  error: {
+    color: colors.danger,
+    fontSize: 13,
+    marginBottom: 12,
+    backgroundColor: "rgba(220,38,38,0.08)",
+    borderRadius: radii.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
   acciones: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -429,12 +461,15 @@ const styles = StyleSheet.create({
     minWidth: 110,
     paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
   btnGhost: { backgroundColor: "transparent" },
-  btnGhostTxt: { color: "#718096", fontWeight: "600", fontSize: 15 },
-  btnPrimario: { backgroundColor: "#E53E3E" },
+  btnGhostTxt: { color: colors.textMuted, fontWeight: "700", fontSize: 15 },
+  btnPrimario: {
+    backgroundColor: colors.primary,
+    ...shadow.floating,
+  },
   btnPrimTxt: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });
