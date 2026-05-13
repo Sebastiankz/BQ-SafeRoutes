@@ -8,15 +8,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps_auth import get_current_usuario_uuid
+from ..deps_auth import get_current_usuario_uuid, get_current_admin_uuid
 from ..models import Reporte
 from ..models.validacion import Validacion
 from ..schemas import ReporteCreate, ReporteOut
 from ..services.reporte_service import reverse_geocode
 from ..config import get_settings
-from ..schemas.reporte import VigenciaIn, VigenciaOut
+from ..schemas.reporte import VigenciaIn, VigenciaOut, EstadoCambioIn
 from ..services.reporte_service import (
     buscar_reporte_padre,
+    inactivar_grupo,
     registrar_confirmacion,
     registrar_vigencia,
 )
@@ -134,8 +135,11 @@ def listar_reportes(
     ),
     db: Session = Depends(get_db),
 ):
-    stmt = _build_reporte_select().where(Reporte.reporte_padre_id.is_(None))
+    stmt = _build_reporte_select()
+    # Solo excluir reportes hijo cuando se consulta el feed público (estado específico).
+    # En la vista admin (estado="todos") se muestran todos, incluyendo hijos.
     if estado and estado != "todos":
+        stmt = stmt.where(Reporte.reporte_padre_id.is_(None))
         stmt = stmt.where(Reporte.estado == estado)
 
     rows = (
@@ -144,6 +148,52 @@ def listar_reportes(
         .all()
     )
     return rows
+
+@router.patch("/{reporte_id}/estado", response_model=ReporteOut)
+def cambiar_estado_admin(
+    reporte_id: int,
+    payload: EstadoCambioIn,
+    admin_id: Annotated[UUID, Depends(get_current_admin_uuid)],
+    db: Session = Depends(get_db),
+):
+    """
+    Cambia el estado de un reporte manualmente (solo admins).
+    Transiciones permitidas:
+      - pendiente  → confirmado
+      - confirmado → inactivo
+    """
+    from datetime import datetime, timezone
+
+    reporte = db.execute(select(Reporte).where(Reporte.id == reporte_id)).scalar_one_or_none()
+    if not reporte:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado")
+
+    nuevo = payload.estado
+    actual = reporte.estado
+
+    transiciones_validas = {
+        ("pendiente", "confirmado"),
+        ("confirmado", "inactivo"),
+        ("pendiente", "inactivo"),
+    }
+    if (actual, nuevo) not in transiciones_validas:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transición no permitida: {actual} → {nuevo}",
+        )
+
+    if nuevo == "confirmado":
+        reporte.estado = nuevo
+        reporte.activo = True
+        reporte.confirmado_at = datetime.now(timezone.utc)
+    elif nuevo == "inactivo":
+        inactivar_grupo(db, reporte)
+
+    db.commit()
+
+    row = db.execute(_build_reporte_select().where(Reporte.id == reporte_id)).mappings().first()
+    return row
+
 
 @router.get("/{reporte_id}", response_model=ReporteOut)
 def obtener_reporte(reporte_id: int, db: Session = Depends(get_db)):

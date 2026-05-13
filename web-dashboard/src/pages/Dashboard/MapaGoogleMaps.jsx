@@ -74,12 +74,12 @@ const SEVERIDAD_LABEL = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Devuelve el SVG icon de un pin de color para Google Maps Marker clásico. */
-function pinIcon(color) {
+function pinIcon(color, opacity = 1) {
   return {
     // Ruta SVG del pin estándar de Google Maps
     path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
     fillColor: color,
-    fillOpacity: 1,
+    fillOpacity: opacity,
     strokeColor: "#ffffff",
     strokeWeight: 1.5,
     scale: 1.6,
@@ -104,9 +104,17 @@ function buildInfoContent(r) {
   const hace = tiempoRelativo(r.created_at);
   const sev = SEVERIDAD_LABEL[r.severidad] ?? "—";
   const color = TIPO_COLOR_HEX[r.tipo] ?? "#64748B";
+  const estadoBadge = {
+    pendiente: { icon: "🟡", label: "Pendiente" },
+    confirmado: { icon: "🟢", label: "Confirmado" },
+    inactivo: { icon: "⚪", label: "Inactivo" },
+  }[r.estado] ?? { icon: "⚫", label: r.estado };
   return `
     <div style="font-family:sans-serif;font-size:13px;min-width:170px;max-width:230px;padding:4px">
-      <p style="font-weight:700;margin:0 0 5px;color:${color};font-size:14px">${label}</p>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <p style="font-weight:700;margin:0;color:${color};font-size:14px">${label}</p>
+        <span style="font-size:10px;background:#f1f5f9;border-radius:999px;padding:1px 6px;color:#475569">${estadoBadge.icon} ${estadoBadge.label}</span>
+      </div>
       <p style="margin:0 0 3px;color:#444">📍 ${dir}</p>
       <p style="margin:0 0 3px;color:#666">🕐 hace ${hace}</p>
       <p style="margin:0;color:#888;font-size:11px">Severidad: ${sev} · #${r.id}</p>
@@ -276,12 +284,14 @@ export default function MapaGoogleMaps({
 
       const isNew = newIds.has(r.id);
       const color = TIPO_COLOR_HEX[r.tipo] ?? "#64748B";
+      // pendiente: opacidad reducida para indicar que aún no está confirmado
+      const opacity = r.estado === "pendiente" ? 0.55 : 1.0;
 
       const marker = new window.google.maps.Marker({
         position: { lat: r.latitud, lng: r.longitud },
         map: mapRef.current,
         title: TIPO_LABEL_MAPA[r.tipo] ?? r.tipo,
-        icon: pinIcon(color),
+        icon: pinIcon(color, opacity),
         animation: isNew ? window.google.maps.Animation.DROP : null,
         zIndex: isNew ? 10 : 5,
       });

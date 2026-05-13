@@ -25,6 +25,14 @@ function normalizeAuthPayload(payload) {
   };
 }
 
+// El email admin debe tener dominio exactamente "admin" o que empiece con "admin."
+// Ej. válidos: policia@admin, policia@admin.co, admin@admin.barranquilla.gov.co
+export function isAdminEmail(email) {
+  if (!email || !email.includes("@")) return false;
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  return domain === "admin" || domain.startsWith("admin.");
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [usuario, setUsuario] = useState(null);
@@ -113,6 +121,7 @@ export function AuthProvider({ children }) {
       token,
       usuario,
       hydrating,
+      isAdmin: isAdminEmail(usuario?.email),
       iniciarSesion,
       registrar,
       cerrarSesion,
