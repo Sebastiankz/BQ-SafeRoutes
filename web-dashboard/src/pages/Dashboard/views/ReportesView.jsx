@@ -1,54 +1,57 @@
-// src/pages/Dashboard/views/ReportesView.jsx
+﻿// src/pages/Dashboard/views/ReportesView.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Avatar, Button, Chip, Table } from "@heroui/react";
+import { CheckCircle, ChevronUp, Loader2, XCircle } from "lucide-react";
 import { getReportes, cambiarEstadoReporte } from "../../../api/reportes";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
-const SEVERIDAD_COLORS = {
-  Leve: "bg-slate-100  text-slate-600  border border-slate-200",
-  "Solo Daños": "bg-blue-100   text-blue-700   border border-blue-200",
-  "Riesgo Alto": "bg-purple-100 text-purple-700 border border-purple-200",
-  Heridos: "bg-orange-100 text-orange-700 border border-orange-200",
-  Muertos: "bg-red-100    text-red-700    border border-red-200",
-};
-
-const ESTADO_BADGE = {
-  pendiente: "bg-orange-100 text-orange-700 border border-orange-200",
-  confirmado: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-  inactivo: "bg-slate-100 text-slate-500 border border-slate-200",
-};
-
-const ESTADO_ICON = {
-  pendiente: "🟡",
-  confirmado: "🟢",
-  inactivo: "⚪",
-};
-
-const TIPO_ICON = {
-  accidente: "⚠️",
-  hueco: "🕳️",
-  arroyo: "🌊",
-  semaforo_danado: "🚦",
-  otro: "📌",
-};
-
+// â”€â”€â”€ Maps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SEVERIDAD_LABEL = {
   1: "Leve",
-  2: "Solo Daños",
+  2: "Solo Da\u00F1os",
   3: "Riesgo Alto",
   4: "Heridos",
   5: "Muertos",
+};
+
+const SEVERIDAD_CHIP_COLOR = {
+  Leve: "default",
+  "Solo Da\u00F1os": "accent",
+  "Riesgo Alto": "warning",
+  Heridos: "warning",
+  Muertos: "danger",
+};
+
+const ESTADO_CHIP_COLOR = {
+  pendiente: "warning",
+  confirmado: "success",
+  inactivo: "default",
+};
+
+const ESTADO_ICON = {
+  pendiente: "\uD83D\uDFE1",
+  confirmado: "\uD83D\uDFE2",
+  inactivo: "\u26AA",
+};
+
+const TIPO_ICON = {
+  accidente: "\u26A0\uFE0F",
+  hueco: "\uD83D\uDD73\uFE0F",
+  arroyo: "\uD83C\uDF0A",
+  semaforo_danado: "\uD83D\uDEA6",
+  otro: "\uD83D\uDCCC",
 };
 
 const TIPO_LABEL = {
   accidente: "Accidente",
   hueco: "Hueco",
   arroyo: "Arroyo",
-  semaforo_danado: "Semáforo",
+  semaforo_danado: "Sem\u00E1foro",
   otro: "Otro",
 };
 
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function formatFecha(iso) {
   const d = new Date(iso);
   return d.toLocaleString("es-CO", {
@@ -62,17 +65,40 @@ function formatFecha(iso) {
 }
 
 function truncarId(uuid) {
-  return uuid.slice(0, 8) + "…";
+  return uuid?.slice(0, 8) + "â€¦";
 }
 
+function emailInitial(email) {
+  return email ? email[0].toUpperCase() : "?";
+}
+
+function SortableColumnHeader({ children, sortDirection }) {
+  return (
+    <span className="flex items-center justify-between gap-1">
+      {children}
+      {sortDirection && (
+        <ChevronUp
+          className={`size-3 shrink-0 transition-transform duration-100 ${
+            sortDirection === "descending" ? "rotate-180" : ""
+          }`}
+        />
+      )}
+    </span>
+  );
+}
+
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function ReportesView() {
   const { isAdmin } = useAuth();
   const [reportes, setReportes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("todos");
-  // Mapa id → estado de carga de la acción por fila
   const [accionLoading, setAccionLoading] = useState({});
+  const [sortDescriptor, setSortDescriptor] = useState({
+    column: "created_at",
+    direction: "descending",
+  });
 
   const cargarReportes = useCallback((isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -85,10 +111,7 @@ export default function ReportesView() {
   }, []);
 
   useEffect(() => {
-    // Carga inicial
     cargarReportes(true);
-
-    // Realtime: refetch inmediato ante cualquier cambio en la tabla reportes
     const channel = supabase
       .channel("reportes-view-live")
       .on(
@@ -97,24 +120,14 @@ export default function ReportesView() {
         () => cargarReportes(false),
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [cargarReportes]);
 
-  // IDs de reportes padre que ya están confirmados.
-  // Los hijos (reporte_padre_id !== null) heredan visualmente ese estado
-  // SOLO en esta vista — en la BD y en el feed/mapa el estado real no cambia.
   const padresConfirmados = useMemo(
-    () =>
-      new Set(
-        reportes.filter((r) => r.estado === "confirmado").map((r) => r.id),
-      ),
+    () => new Set(reportes.filter((r) => r.estado === "confirmado").map((r) => r.id)),
     [reportes],
   );
 
-  // Estado visual: si el reporte es pendiente y su padre está confirmado → mostrar como confirmado.
   function estadoDisplayDe(r) {
     if (
       r.estado === "pendiente" &&
@@ -131,13 +144,25 @@ export default function ReportesView() {
       ? reportes
       : reportes.filter((r) => estadoDisplayDe(r) === filtroEstado);
 
+  const sortedFiltered = useMemo(() => {
+    return [...filtrados].sort((a, b) => {
+      const col = sortDescriptor.column;
+      const numericCols = ["id", "severidad", "validaciones"];
+      let cmp;
+      if (numericCols.includes(col)) {
+        cmp = (Number(a[col]) || 0) - (Number(b[col]) || 0);
+      } else {
+        cmp = String(a[col] ?? "").localeCompare(String(b[col] ?? ""), "es");
+      }
+      return sortDescriptor.direction === "descending" ? -cmp : cmp;
+    });
+  }, [filtrados, sortDescriptor]);
+
   async function handleCambioEstado(r, nuevoEstado) {
-    // Si es un hijo con padre, actuamos sobre el padre para que el cambio sea real en BD
     const idObjetivo = r.reporte_padre_id ?? r.id;
     setAccionLoading((prev) => ({ ...prev, [r.id]: true }));
     try {
       await cambiarEstadoReporte(idObjetivo, nuevoEstado);
-      // El Realtime de Supabase disparará cargarReportes automáticamente
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -145,19 +170,22 @@ export default function ReportesView() {
     }
   }
 
+  // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-slate-50 dark:bg-gray-900">
+      {/* Header */}
       <div className="mb-5">
         <h2 className="text-base font-bold text-slate-800 dark:text-white">
-          Base de Datos Maestras · Reportes
+          Base de Datos Maestras \u00B7 Reportes
         </h2>
         <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
           {loading
-            ? "Cargando…"
+            ? "Cargando\u2026"
             : error
               ? `Error: ${error}`
               : `${filtrados.length} de ${reportes.length} registros`}
         </p>
+
         {/* Filtros de estado */}
         {!loading && !error && (
           <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -174,11 +202,9 @@ export default function ReportesView() {
                 {e !== "todos" && <span>{ESTADO_ICON[e]}</span>}
                 {e.charAt(0).toUpperCase() + e.slice(1)}
                 <span className="ml-0.5 opacity-60">
-                  (
-                  {e === "todos"
+                  ({e === "todos"
                     ? reportes.length
-                    : reportes.filter((r) => estadoDisplayDe(r) === e).length}
-                  )
+                    : reportes.filter((r) => estadoDisplayDe(r) === e).length})
                 </span>
               </button>
             ))}
@@ -186,116 +212,181 @@ export default function ReportesView() {
         )}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-slate-200 dark:border-gray-700 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 dark:border-gray-700">
-              {[
-                "ID",
-                "Usuario ID",
-                "Fecha / Hora",
-                "Dirección",
-                "Tipo",
-                "Severidad",
-                "Estado",
-                ...(isAdmin ? ["Acciones"] : []),
-              ].map((col) => (
-                <th
-                  key={col}
-                  className="px-5 py-3 text-left text-xs font-semibold tracking-widest uppercase text-slate-400 dark:text-gray-500"
-                >
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.map((r, i) => {
-              const sevLabel =
-                SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
-              const tipoLabel = TIPO_LABEL[r.tipo] ?? r.tipo;
-              return (
-                <tr
-                  key={r.id}
-                  className={`border-b border-slate-50 dark:border-gray-700/50 hover:bg-slate-50 dark:hover:bg-gray-700/30 transition-colors ${i === filtrados.length - 1 ? "border-b-0" : ""}`}
-                >
-                  <td className="px-5 py-4">
-                    <span className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-                      #{r.id}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs text-slate-500 dark:text-gray-400">
-                    <span title={r.usuario_id}>{truncarId(r.usuario_id)}</span>
-                  </td>
-                  <td className="px-5 py-4 text-slate-600 dark:text-gray-300 whitespace-nowrap">
-                    {formatFecha(r.created_at)}
-                  </td>
-                  <td className="px-5 py-4 text-slate-700 dark:text-gray-200">
-                    {r.direccion ?? "Sin dirección"}
-                  </td>
-                  <td className="px-5 py-4 text-slate-700 dark:text-gray-200">
-                    <span className="flex items-center gap-1.5">
-                      <span>{TIPO_ICON[r.tipo] ?? "📌"}</span>
-                      {tipoLabel}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide ${SEVERIDAD_COLORS[sevLabel] ?? "bg-slate-100 text-slate-600"}`}
-                    >
-                      {sevLabel}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full capitalize ${ESTADO_BADGE[estadoDisplayDe(r)] ?? "bg-slate-100 text-slate-500"}`}
-                    >
-                      <span>{ESTADO_ICON[estadoDisplayDe(r)] ?? "⚫"}</span>
-                      {estadoDisplayDe(r)}
-                    </span>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        {estadoDisplayDe(r) === "pendiente" && (
-                          <button
-                            onClick={() => handleCambioEstado(r, "confirmado")}
-                            disabled={accionLoading[r.id]}
-                            title="Confirmar reporte"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                          >
-                            {accionLoading[r.id] ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            )}
-                            Confirmar
-                          </button>
-                        )}
-                        {estadoDisplayDe(r) === "confirmado" && (
-                          <button
-                            onClick={() => handleCambioEstado(r, "inactivo")}
-                            disabled={accionLoading[r.id]}
-                            title="Marcar como inactivo"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                          >
-                            {accionLoading[r.id] ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <XCircle className="w-3.5 h-3.5" />
-                            )}
-                            Inactivar
-                          </button>
-                        )}
-                      </div>
-                    </td>
+      {/* Loading / Error */}
+      {loading && (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="size-8 animate-spin text-blue-500" />
+        </div>
+      )}
+      {error && !loading && (
+        <p className="text-red-500 text-sm text-center py-10">{error}</p>
+      )}
+
+      {/* Table */}
+      {!loading && !error && (
+        <Table>
+          <Table.ScrollContainer minWidth={820}>
+            <Table.Content
+              aria-label="Reportes ciudadanos"
+              sortDescriptor={sortDescriptor}
+              onSortChange={setSortDescriptor}
+              selectionMode="none"
+            >
+              <Table.Header>
+                <Table.Column allowsSorting isRowHeader id="id">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>ID</SortableColumnHeader>
                   )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                </Table.Column>
+                <Table.Column allowsSorting id="usuario_email">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>Email</SortableColumnHeader>
+                  )}
+                </Table.Column>
+                <Table.Column allowsSorting id="created_at">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>Fecha / Hora</SortableColumnHeader>
+                  )}
+                </Table.Column>
+                <Table.Column id="direccion">Direccion</Table.Column>
+                <Table.Column allowsSorting id="tipo">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>Tipo</SortableColumnHeader>
+                  )}
+                </Table.Column>
+                <Table.Column allowsSorting id="severidad">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>Severidad</SortableColumnHeader>
+                  )}
+                </Table.Column>
+                <Table.Column allowsSorting id="estado">
+                  {({ sortDirection }) => (
+                    <SortableColumnHeader sortDirection={sortDirection}>Estado</SortableColumnHeader>
+                  )}
+                </Table.Column>
+                {isAdmin && (
+                  <Table.Column id="acciones" className="text-end">Acciones</Table.Column>
+                )}
+              </Table.Header>
+
+              <Table.Body items={sortedFiltered}>
+                {(r) => {
+                  const sevLabel = SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
+                  const tipoLabel = TIPO_LABEL[r.tipo] ?? r.tipo;
+                  const estadoDisplay = estadoDisplayDe(r);
+                  return (
+                    <Table.Row id={r.id}>
+                      {/* ID */}
+                      <Table.Cell>
+                        <Chip color="accent" variant="soft" size="sm">
+                          #{r.id}
+                        </Chip>
+                      </Table.Cell>
+
+                      {/* Email / Reporter */}
+                      <Table.Cell>
+                        <div className="flex items-center gap-3">
+                          <Avatar size="sm">
+                            <Avatar.Fallback color="accent">
+                              {emailInitial(r.usuario_email)}
+                            </Avatar.Fallback>
+                          </Avatar>
+                          <span className="text-xs font-medium truncate">
+                            {r.usuario_email ?? "\u2014"}
+                          </span>
+                        </div>
+                      </Table.Cell>
+
+                      {/* Fecha */}
+                      <Table.Cell className="whitespace-nowrap text-xs">
+                        {formatFecha(r.created_at)}
+                      </Table.Cell>
+
+                      {/* DirecciÃ³n */}
+                      <Table.Cell className="text-xs max-w-xs truncate">
+                        {r.direccion ?? "Sin direcciÃ³n"}
+                      </Table.Cell>
+
+                      {/* Tipo */}
+                      <Table.Cell>
+                        <span className="flex items-center gap-1.5 text-xs">
+                          <span>{TIPO_ICON[r.tipo] ?? "ðŸ“Œ"}</span>
+                          {tipoLabel}
+                        </span>
+                      </Table.Cell>
+
+                      {/* Severidad */}
+                      <Table.Cell>
+                        <Chip
+                          color={SEVERIDAD_CHIP_COLOR[sevLabel] ?? "default"}
+                          variant="soft"
+                          size="sm"
+                        >
+                          {sevLabel}
+                        </Chip>
+                      </Table.Cell>
+
+                      {/* Estado */}
+                      <Table.Cell>
+                        <Chip
+                          color={ESTADO_CHIP_COLOR[estadoDisplay] ?? "default"}
+                          variant="soft"
+                          size="sm"
+                        >
+                          <span className="flex items-center gap-1">
+                            <span>{ESTADO_ICON[estadoDisplay] ?? "âš«"}</span>
+                            {estadoDisplay}
+                          </span>
+                        </Chip>
+                      </Table.Cell>
+
+                      {/* Acciones (admin only) */}
+                      {isAdmin && (
+                        <Table.Cell>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {estadoDisplay === "pendiente" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                isDisabled={!!accionLoading[r.id]}
+                                onPress={() => handleCambioEstado(r, "confirmado")}
+                                className="flex items-center gap-1"
+                              >
+                                {accionLoading[r.id] ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="size-3.5" />
+                                )}
+                                Confirmar
+                              </Button>
+                            )}
+                            {estadoDisplay === "confirmado" && (
+                              <Button
+                                size="sm"
+                                variant="danger-soft"
+                                isDisabled={!!accionLoading[r.id]}
+                                onPress={() => handleCambioEstado(r, "inactivo")}
+                                className="flex items-center gap-1"
+                              >
+                                {accionLoading[r.id] ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <XCircle className="size-3.5" />
+                                )}
+                                Inactivar
+                              </Button>
+                            )}
+                          </div>
+                        </Table.Cell>
+                      )}
+                    </Table.Row>
+                  );
+                }}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+        </Table>
+      )}
     </main>
   );
 }

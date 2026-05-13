@@ -1,15 +1,18 @@
 // src/pages/Dashboard/ReporteFeed.jsx
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { Chip } from "@heroui/react";
 import {
-  X,
-  MapPin,
-  Clock,
   AlertTriangle,
-  Zap,
+  Bell,
+  Camera,
+  Clock,
+  ExternalLink,
+  MapPin,
   Navigation,
   Timer,
-  Bell,
+  X,
+  Zap,
 } from "lucide-react";
 
 const TIPO_LABEL = {
@@ -88,6 +91,7 @@ function adaptarReporte(r) {
     estadoDot: estado.dot,
     estadoBadge: estado.badge,
     prioridad: SEVERIDAD_PRIORIDAD[r.severidad] ?? "Media",
+    foto_url: r.foto_url ?? null,
   };
 }
 
@@ -98,78 +102,151 @@ const ICONO_MAP = {
   timer: <Timer size={14} />,
 };
 
-const PRIORIDAD_COLOR = {
-  Crítica: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  Alta: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-  Media: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-};
-
 // ── Modal de detalle ─────────────────────────────────────────
 function ReporteModal({ reporte, onClose }) {
+  const [fotoAmpliada, setFotoAmpliada] = useState(false);
+
+  const prioridadColor =
+    reporte.prioridad === "Crítica"
+      ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+      : reporte.prioridad === "Alta"
+        ? "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+        : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
+
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
-      {/* Tarjeta del modal — stopPropagation evita cerrar al hacer clic adentro */}
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header del modal */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={`${reporte.color} p-2 bg-slate-100 dark:bg-gray-700 rounded-lg`}
-            >
+        {/* ── Header coloreado */}
+        <div className="relative px-6 pt-6 pb-5">
+          {/* fondo decorativo sutil */}
+          <div className={`absolute inset-0 opacity-[0.06] ${
+            reporte.prioridad === "Crítica" ? "bg-red-500" :
+            reporte.prioridad === "Alta"    ? "bg-orange-500" : "bg-blue-500"
+          }`} />
+
+          <div className="relative flex items-start gap-4">
+            {/* Icono */}
+            <div className={`${reporte.color} flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-100 dark:bg-gray-700 shrink-0 text-lg`}>
               {ICONO_MAP[reporte.icono]}
             </div>
-            <div>
-              <h2 className="font-bold text-slate-800 dark:text-white">
+
+            {/* Títulos */}
+            <div className="flex-1 min-w-0 pt-0.5">
+              <h2 className="text-base font-bold text-slate-800 dark:text-white leading-tight">
                 {reporte.tipo}
               </h2>
-              <p className="text-xs text-slate-400 dark:text-gray-400">
-                Reporte #{reporte.id}
+              <p className="text-xs text-slate-400 dark:text-gray-400 mt-0.5">
+                Reporte <span className="font-mono">#{reporte.id}</span>
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${prioridadColor}`}>
+                  {reporte.prioridad}
+                </span>
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${reporte.estadoBadge}`}>
+                  {reporte.estado}
+                </span>
+              </div>
+            </div>
+
+            {/* Cerrar */}
+            <button
+              onClick={onClose}
+              className="shrink-0 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-100 dark:border-gray-700" />
+
+        {/* ── Foto (opcional) */}
+        {reporte.foto_url && (
+          <div className="relative overflow-hidden bg-slate-100 dark:bg-gray-700">
+            {fotoAmpliada ? (
+              <img
+                src={reporte.foto_url}
+                alt="Foto del reporte"
+                className="w-full object-contain max-h-80 cursor-zoom-out"
+                onClick={() => setFotoAmpliada(false)}
+              />
+            ) : (
+              <div className="relative cursor-zoom-in group" onClick={() => setFotoAmpliada(true)}>
+                <img
+                  src={reporte.foto_url}
+                  alt="Foto del reporte"
+                  className="w-full h-48 object-cover"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <ExternalLink size={13} /> Ver foto completa
+                  </span>
+                </div>
+                <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 text-white text-[10px] font-semibold px-2 py-1 rounded-full backdrop-blur-sm">
+                  <Camera size={10} /> Foto del reporte
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Cuerpo */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Dirección */}
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 shrink-0">
+              <MapPin size={15} className="text-blue-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-0.5">
+                Dirección
+              </p>
+              <p className="text-sm text-slate-700 dark:text-gray-200 leading-snug">
+                {reporte.direccion}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
 
-        {/* Cuerpo */}
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
-            <MapPin size={14} className="text-blue-500 shrink-0" />
-            <span>{reporte.direccion}</span>
-          </div>
-          <div className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
-            <Clock size={14} className="text-slate-400 shrink-0" />
-            <span>Reportado hace {reporte.hace}</span>
-          </div>
-          <p className="text-slate-600 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 rounded-lg p-3">
-            {reporte.descripcion}
-          </p>
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Prioridad:</span>
-              <span
-                className={`text-xs font-bold px-2 py-0.5 rounded-full ${PRIORIDAD_COLOR[reporte.prioridad]}`}
-              >
-                {reporte.prioridad}
-              </span>
+          {/* Tiempo */}
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-slate-50 dark:bg-gray-700 shrink-0">
+              <Clock size={15} className="text-slate-400" />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Estado:</span>
-              <span className={`text-xs font-bold ${reporte.estadoDot}`}>
-                ● {reporte.estado}
-              </span>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-0.5">
+                Reportado
+              </p>
+              <p className="text-sm text-slate-700 dark:text-gray-200">
+                hace {reporte.hace}
+              </p>
             </div>
           </div>
+
+          {/* Descripción */}
+          {reporte.descripcion !== "Sin descripción" && (
+            <div className="rounded-xl bg-slate-50 dark:bg-gray-700/60 p-4 border border-slate-100 dark:border-gray-600">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-1.5">
+                Descripción
+              </p>
+              <p className="text-sm text-slate-600 dark:text-gray-300 leading-relaxed">
+                {reporte.descripcion}
+              </p>
+            </div>
+          )}
+
+          {/* Sin foto */}
+          {!reporte.foto_url && (
+            <p className="flex items-center gap-1.5 text-xs text-slate-300 dark:text-gray-600">
+              <Camera size={12} /> Sin foto adjunta
+            </p>
+          )}
         </div>
       </div>
     </div>,
