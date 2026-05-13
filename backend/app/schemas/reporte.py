@@ -42,3 +42,7 @@ class VigenciaOut(BaseModel):
     reporte_id: int
     estado: EstadoReporte
     activo: bool
+
+# Para cambio manual de estado por admin
+class EstadoCambioIn(BaseModel):
+    estado: Literal["confirmado", "inactivo"]

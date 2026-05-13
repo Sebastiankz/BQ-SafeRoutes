@@ -1,4 +1,4 @@
-"""Lógica de consenso comunitario para reportes.
+﻿"""Lógica de consenso comunitario para reportes.
 
 Define los umbrales y las operaciones que mueven un reporte entre
 los tres estados: pendiente -> confirmado -> inactivo.
@@ -14,7 +14,7 @@ from urllib.request import urlopen
 from urllib.parse import urlencode
 import json
 
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, or_, select, update
 from sqlalchemy.orm import Session
 from geoalchemy2 import Geography
 
@@ -105,6 +105,19 @@ def registrar_confirmacion(db: Session, padre: Reporte, usuario_id: UUID) -> Rep
     return padre
 
 
+
+def inactivar_grupo(db: Session, reporte: Reporte) -> None:
+    """Marca como inactivo el padre del grupo y todos sus hijos en una sola query.
+
+    No hace commit; el caller lo gestiona.
+    """
+    raiz_id = reporte.reporte_padre_id if reporte.reporte_padre_id else reporte.id
+    db.execute(
+        update(Reporte)
+        .where(or_(Reporte.id == raiz_id, Reporte.reporte_padre_id == raiz_id))
+        .values(estado="inactivo", activo=False)
+        .execution_options(synchronize_session="fetch")
+    )
 def registrar_vigencia(
     db: Session,
     reporte: Reporte,
@@ -138,8 +151,6 @@ def registrar_vigencia(
         and len(ultimos) == UMBRAL_INACTIVACION
         and all(v == "proximidad_no" for v in ultimos)
     ):
-        reporte.estado = "inactivo"
-        reporte.activo = False
-        reporte.inactivado_at = func.now()
+        inactivar_grupo(db, reporte)
 
     return reporte

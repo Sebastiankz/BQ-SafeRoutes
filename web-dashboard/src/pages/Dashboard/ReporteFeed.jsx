@@ -44,6 +44,26 @@ const SEVERIDAD_PRIORIDAD = {
   5: "Crítica",
 };
 
+const ESTADO_CONFIG = {
+  pendiente: {
+    label: "Pendiente",
+    dot: "text-orange-400",
+    badge:
+      "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  },
+  confirmado: {
+    label: "Confirmado",
+    dot: "text-emerald-500",
+    badge:
+      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  inactivo: {
+    label: "Inactivo",
+    dot: "text-slate-400",
+    badge: "bg-slate-100 text-slate-500 dark:bg-gray-700 dark:text-gray-400",
+  },
+};
+
 function tiempoRelativo(iso) {
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (diff < 60) return `${diff} seg`;
@@ -54,6 +74,7 @@ function tiempoRelativo(iso) {
 }
 
 function adaptarReporte(r) {
+  const estado = ESTADO_CONFIG[r.estado] ?? ESTADO_CONFIG.pendiente;
   return {
     id: r.id,
     tipo: TIPO_LABEL[r.tipo] ?? r.tipo,
@@ -63,7 +84,9 @@ function adaptarReporte(r) {
       r.direccion ?? `${r.latitud.toFixed(4)}, ${r.longitud.toFixed(4)}`,
     descripcion: r.descripcion ?? "Sin descripción",
     hace: tiempoRelativo(r.created_at),
-    estado: r.estado === "pendiente" ? "Activo" : "Atendido",
+    estado: estado.label,
+    estadoDot: estado.dot,
+    estadoBadge: estado.badge,
     prioridad: SEVERIDAD_PRIORIDAD[r.severidad] ?? "Media",
   };
 }
@@ -142,9 +165,7 @@ function ReporteModal({ reporte, onClose }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400">Estado:</span>
-              <span
-                className={`text-xs font-bold ${reporte.estado === "Atendido" ? "text-emerald-500" : "text-orange-500"}`}
-              >
+              <span className={`text-xs font-bold ${reporte.estadoDot}`}>
                 ● {reporte.estado}
               </span>
             </div>
@@ -225,9 +246,16 @@ export default function ReporteFeed({ reportes = [], newIds = new Set() }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
-                    <MapPin size={10} /> {r.direccion}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1">
+                      <MapPin size={10} /> {r.direccion}
+                    </p>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${r.estadoBadge}`}
+                    >
+                      {r.estado}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-gray-400 mt-1 line-clamp-1">
                     {r.descripcion}
                   </p>
