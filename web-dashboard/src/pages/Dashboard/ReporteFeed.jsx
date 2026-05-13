@@ -206,7 +206,7 @@ export default function ReporteFeed({ reportes = [], newIds = new Set() }) {
         <div className="flex items-center gap-1 mt-0.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs text-slate-400 dark:text-gray-400 uppercase tracking-widest">
-            En vivo · actualiza c/30 s
+            Reportes Actualizado
           </span>
         </div>
       </div>

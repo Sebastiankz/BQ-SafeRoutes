@@ -73,17 +73,40 @@ const SEVERIDAD_LABEL = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Devuelve el SVG icon de un pin de color para Google Maps Marker clásico. */
-function pinIcon(color, opacity = 1) {
+// Emoji por tipo — mismo criterio que el mobile
+const TIPO_EMOJI = {
+  accidente:       "🚗",
+  hueco:           "🕳️",
+  arroyo:          "🌊",
+  semaforo_danado: "🚦",
+  otro:            "⚠️",
+};
+
+/**
+ * Icono de marcador personalizado como data URI SVG.
+ * Círculo de color + emoji del tipo + punta triangular hacia abajo.
+ * Misma paleta de colores que el mobile (TIPO_COLOR_HEX / ICONO_POR_TIPO).
+ */
+function buildMarkerIcon(tipo, opacity = 1) {
+  const color    = TIPO_COLOR_HEX[tipo] ?? "#64748B";
+  const emoji    = TIPO_EMOJI[tipo]     ?? "⚠️";
+  const alphaHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">`,
+    // Sombra
+    `<ellipse cx="22" cy="52" rx="9" ry="3.5" fill="rgba(0,0,0,0.20)"/>`,
+    // Punta triangular
+    `<polygon points="14,36 30,36 22,52" fill="${color}${alphaHex}"/>`,
+    // Círculo de fondo
+    `<circle cx="22" cy="20" r="18" fill="${color}${alphaHex}" stroke="white" stroke-width="2.5"/>`,
+    // Emoji centrado
+    `<text x="22" y="27" text-anchor="middle" font-size="18">${emoji}</text>`,
+    `</svg>`,
+  ].join("");
   return {
-    // Ruta SVG del pin estándar de Google Maps
-    path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-    fillColor: color,
-    fillOpacity: opacity,
-    strokeColor: "#ffffff",
-    strokeWeight: 1.5,
-    scale: 1.6,
-    anchor: new window.google.maps.Point(12, 22),
+    url:        "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(44, 54),
+    anchor:     new window.google.maps.Point(22, 54),
   };
 }
 
@@ -282,8 +305,7 @@ export default function MapaGoogleMaps({
       if (markersRef.current.has(r.id)) continue; // ya existe
       if (!Number.isFinite(r.latitud) || !Number.isFinite(r.longitud)) continue;
 
-      const isNew = newIds.has(r.id);
-      const color = TIPO_COLOR_HEX[r.tipo] ?? "#64748B";
+      const isNew  = newIds.has(r.id);
       // pendiente: opacidad reducida para indicar que aún no está confirmado
       const opacity = r.estado === "pendiente" ? 0.55 : 1.0;
 
@@ -291,7 +313,7 @@ export default function MapaGoogleMaps({
         position: { lat: r.latitud, lng: r.longitud },
         map: mapRef.current,
         title: TIPO_LABEL_MAPA[r.tipo] ?? r.tipo,
-        icon: pinIcon(color, opacity),
+        icon: buildMarkerIcon(r.tipo, opacity),
         animation: isNew ? window.google.maps.Animation.DROP : null,
         zIndex: isNew ? 10 : 5,
       });

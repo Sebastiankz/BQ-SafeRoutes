@@ -28,7 +28,8 @@ import type { RootDrawerParamList } from "../navigation/types";
 import type { Hotspot, HotspotFilter } from "../services/hotspots";
 import { listarHotspots } from "../services/hotspots";
 import type { Reporte } from "../services/reportes";
-import { listarReportes, responderVigencia } from "../services/reportes";
+import { responderVigencia } from "../services/reportes";
+import { useReportesLive } from "../hooks/useReportesLive";
 import { colors, iosTitleFont, radii, shadow } from "../theme/tokens";
 
 type DrawerNav = DrawerNavigationProp<RootDrawerParamList>;
@@ -52,11 +53,20 @@ type HudState = {
 };
 
 const COLOR_POR_TIPO: Record<string, string> = {
-  accidente: colors.danger,
-  hueco: colors.accent,
+  accidente: "#DC2626",
+  hueco: "#D97706",
   arroyo: "#2563EB",
   semaforo_danado: "#7C3AED",
-  otro: colors.textMuted,
+  otro: "#6B7280",
+};
+
+// Nombre de icono de MaterialCommunityIcons por tipo de reporte
+const ICONO_POR_TIPO: Record<string, string> = {
+  accidente: "car-emergency",
+  hueco: "road-variant",
+  arroyo: "waves",
+  semaforo_danado: "traffic-light",
+  otro: "alert-circle",
 };
 
 const HEATMAP_GRADIENT = {
@@ -151,10 +161,17 @@ export default function MapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [reportes, setReportes] = useState<Reporte[]>([]);
+  // Reportes en tiempo real — Supabase Realtime + fallback poll 60s.
+  // Todos los usuarios ven los mismos reportes confirmados al instante.
+  const {
+    reportes,
+    cargando: cargandoReportes,
+    error: errorReportes,
+    refetch: cargarReportes,
+  } = useReportesLive();
+
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-  const [cargandoReportes, setCargandoReportes] = useState(true);
-  const [errorReportes, setErrorReportes] = useState<string | null>(null);
+  const [errorHotspots, setErrorHotspots] = useState<string | null>(null);
   const [modalNuevo, setModalNuevo] = useState(false);
   const [modalAuthRequerida, setModalAuthRequerida] = useState(false);
 
@@ -410,32 +427,15 @@ export default function MapScreen() {
     setCargandoUbicacion(false);
   }
 
-  const cargarReportes = useCallback(async () => {
-    setErrorReportes(null);
-    try {
-      const lista = await listarReportes(150, 0);
-      setReportes(lista);
-    } catch (e) {
-      const mensaje = e instanceof Error ? e.message : String(e);
-      const sugerencia =
-        __DEV__ && !process.env.EXPO_PUBLIC_API_URL?.trim()
-          ? " En teléfono físico, define EXPO_PUBLIC_API_URL con la IP de tu PC (ej. http://192.168.1.10:8000)."
-          : "";
-      setErrorReportes(mensaje + sugerencia);
-    } finally {
-      setCargandoReportes(false);
-    }
-  }, []);
-
   const cargarHotspots = useCallback(async (f: HotspotFilter) => {
     setCargandoHotspots(true);
-    setErrorReportes(null);
+    setErrorHotspots(null);
     try {
       const hs = await listarHotspots(f);
       setHotspots(hs);
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
-      setErrorReportes(mensaje);
+      setErrorHotspots(mensaje);
     } finally {
       setCargandoHotspots(false);
     }
@@ -447,10 +447,9 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (!cargandoUbicacion) {
-      void cargarReportes();
       void cargarHotspots(filtro);
     }
-  }, [cargandoUbicacion, cargarReportes, cargarHotspots, filtro]);
+  }, [cargandoUbicacion, cargarHotspots, filtro]);
 
   useEffect(() => {
     if (cargandoUbicacion) {
@@ -818,15 +817,28 @@ export default function MapScreen() {
           mapPadding={mapPaddingNavegacion}
         >
           {!heatmapMode &&
-            reportes.map((r) => (
-              <Marker
-                key={r.id}
-                coordinate={{ latitude: r.latitud, longitude: r.longitud }}
-                description={r.descripcion ?? undefined}
-                pinColor={COLOR_POR_TIPO[r.tipo] ?? "#E53E3E"}
-                title={`${r.tipo} · sev. ${r.severidad}`}
-              />
-            ))}
+            reportes.map((r) => {
+              const color = COLOR_POR_TIPO[r.tipo] ?? "#6B7280";
+              const icono = (ICONO_POR_TIPO[r.tipo] ?? "alert-circle") as Parameters<typeof MaterialCommunityIcons>[0]["name"];
+              return (
+                <Marker
+                  key={r.id}
+                  coordinate={{ latitude: r.latitud, longitude: r.longitud }}
+                  title={r.tipo.replace(/_/g, " ")}
+                  description={r.descripcion ?? undefined}
+                  tracksViewChanges={false}
+                >
+                  {/* Icono personalizado por tipo de reporte */}
+                  <View style={[styles.marcadorContenedor, { borderColor: color }]}>
+                    <View style={[styles.marcadorBurbuja, { backgroundColor: color }]}>
+                      <MaterialCommunityIcons name={icono} size={18} color="#fff" />
+                    </View>
+                    {/* Punta de la burbuja */}
+                    <View style={[styles.marcadorPunta, { borderTopColor: color }]} />
+                  </View>
+                </Marker>
+              );
+            })}
 
           {heatmapMode && heatmapPoints.length > 0 && (
             <Heatmap
@@ -1077,6 +1089,38 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   contenedor: { flex: 1 },
   mapa: { flex: 1 },
+  // ── Marcadores personalizados ───────────────────────────────────────────────
+  marcadorContenedor: {
+    alignItems: "center",
+    borderRadius: 24,
+  },
+  marcadorBurbuja: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2.5,
+    borderColor: "#fff",
+    // Sombra iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 4,
+    // Sombra Android
+    elevation: 5,
+  },
+  marcadorPunta: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    marginTop: -1,
+  },
+  // ── General ─────────────────────────────────────────────────────────────────
   centrado: {
     flex: 1,
     alignItems: "center",
