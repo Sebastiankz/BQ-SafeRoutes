@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,14 +9,14 @@ SessionMode = Literal["body", "cookie"]
 class UsuarioSesion(BaseModel):
     id: str
     email: str
-    nombre: str | None = None
+    nombre: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    refresh_token: str | None = None
+    refresh_token: Optional[str] = None
     usuario: UsuarioSesion
 
 
@@ -34,7 +34,7 @@ class RegisterIn(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str | None = None
+    refresh_token: Optional[str] = None
     session_mode: SessionMode = "body"
 
 

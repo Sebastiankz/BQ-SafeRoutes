@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Alert,
+  Dimensions,
   Platform,
   Pressable,
   ScrollView,
@@ -15,14 +16,22 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Heatmap, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ReanimatedView, {
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
 import AuthRequiredModal from "../components/AuthRequiredModal";
 import FiltroHotspotsSheet from "../components/FiltroHotspotsSheet";
 import NuevoReporteModal from "../components/NuevoReporteModal";
 import VigenciaModal from "../components/VigenciaModal";
+import MapaInteractivo from "../components/map/MapaInteractivo";
+import FabReportar from "../components/map/FabReportar";
+import BottomSheetAccesos from "../components/map/BottomSheetAccesos";
+import type { QuickTile } from "../components/map/BottomSheetAccesos";
 import { useAuth } from "../context/AuthContext";
 import type { RootDrawerParamList } from "../navigation/types";
 import type { Hotspot, HotspotFilter } from "../services/hotspots";
@@ -86,21 +95,23 @@ const INTERVALO_UBICACION_MS = 8000;
 const DISTANCIA_MINIMA_MOVIMIENTO_M = 20;
 const INTERVALO_NAVEGACION_MS = 1500;
 const DISTANCIA_NAVEGACION_M = 5;
-const INTERVALO_RENDER_CAMARA_MS = 320;
-const PITCH_NAVEGACION = 64;
+const PITCH_NAVEGACION = 0;
 const ZOOM_NAVEGACION = 17.2;
 const ALTITUD_NAVEGACION = 680;
 const DURACION_ANIMACION_CAMARA_MS = 260;
 const UMBRAL_GIRO_BRUJULA_GRADOS = 6;
-const UMBRAL_CAMBIO_POSICION_CAMARA_M = 2.5;
-const UMBRAL_CAMBIO_RUMBO_CAMARA_GRADOS = 4;
+const UMBRAL_RECARGA_REPORTES_M = 300;
 const OVERLAY_SIDE_PADDING = 16;
-const TOP_ACTION_SIZE = 50;
-const TOP_ACTION_GAP = 12;
-const HUD_TOP_OFFSET = TOP_ACTION_SIZE + TOP_ACTION_GAP;
-const HUD_RIGHT_RESERVE = OVERLAY_SIDE_PADDING + TOP_ACTION_SIZE + 18;
 const BOTTOM_OVERLAY_OFFSET = 24;
-const REPORT_CTA_BOTTOM_OFFSET = 102;
+// Margen del FAB al borde inferior. Sin BottomSheet permanente, basta una
+// respiración propia anclada al borde de pantalla (estilo Waze).
+const REPORT_CTA_BOTTOM_OFFSET = 18;
+// Tamaño visual total del FAB (botón + halo) + separación vertical respecto
+// a la botonera lateral apilada arriba.
+const FAB_VISUAL_EXTENT = 88;
+const FAB_TO_CONTROLES_GAP = 14;
+const ENTRY_STAGGER_MS = 60;
+const ENTRY_DURATION_MS = 360;
 const ALTURA_BANNER = 44;
 const ALTURA_BANNER_ERROR = 52;
 
@@ -147,12 +158,6 @@ export default function MapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
-  const loopCamaraRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ultimoEstadoCamaraRef = useRef<{
-    latitude: number;
-    longitude: number;
-    heading: number;
-  } | null>(null);
 
   const [region, setRegion] = useState(BARRANQUILLA);
   const [cargandoUbicacion, setCargandoUbicacion] = useState(true);
@@ -182,9 +187,10 @@ export default function MapScreen() {
 
   // ── Modo Seguro ────────────────────────────────────────────────────────────
   const [modoSeguroActivo, setModoSeguroActivo] = useState(false);
-  const pulso = useRef(new Animated.Value(1)).current;
-  const animacionPulso = useRef<Animated.CompositeAnimation | null>(null);
   const animEntradaUi = useRef(new Animated.Value(0)).current;
+  const animSearchUi = useRef(new Animated.Value(0)).current;
+  const animControlesUi = useRef(new Animated.Value(0)).current;
+  const animFabUi = useRef(new Animated.Value(0)).current;
 
   // Proximidad: el reporte que está mostrando el prompt y el set de ids ya preguntados.
   const [vigenciaPendiente, setVigenciaPendiente] = useState<Reporte | null>(
@@ -195,34 +201,57 @@ export default function MapScreen() {
   const watcherRef = useRef<Location.LocationSubscription | null>(null);
   const reportesRef = useRef<Reporte[]>([]);
 
-  function toggleModoSeguro() {
+  // ── Toast efímero (feedback para acciones laterales como Modo Seguro) ──
+  const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+  const animToast = useRef(new Animated.Value(0)).current;
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const mostrarToast = useCallback(
+    (mensaje: string) => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      setToastMensaje(mensaje);
+      Animated.timing(animToast, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      toastTimerRef.current = setTimeout(() => {
+        Animated.timing(animToast, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished) setToastMensaje(null);
+        });
+        toastTimerRef.current = null;
+      }, 2400);
+    },
+    [animToast],
+  );
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
+
+  const toggleModoSeguro = useCallback(() => {
     setModoSeguroActivo((prev) => {
       const siguiente = !prev;
-      if (siguiente) {
-        animacionPulso.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulso, {
-              toValue: 1.06,
-              duration: 700,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulso, {
-              toValue: 1,
-              duration: 700,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ]),
-        );
-        animacionPulso.current.start();
-      } else {
-        animacionPulso.current?.stop();
-        pulso.setValue(1);
-      }
+      mostrarToast(
+        siguiente
+          ? "Modo Seguro activado · te avisamos al acercarte a un punto"
+          : "Modo Seguro desactivado",
+      );
       return siguiente;
     });
-  }
+  }, [mostrarToast]);
 
   const debeMostrarListaSinGoogleMaps = !tieneClaveGoogleMaps;
 
@@ -327,7 +356,6 @@ export default function MapScreen() {
   const topOverlayStart = insetSuperior + topOverlayExtra;
   const bottomOverlayStart = insetInferior + BOTTOM_OVERLAY_OFFSET;
   const reportCtaBottom = bottomOverlayStart + REPORT_CTA_BOTTOM_OFFSET;
-  const chipFiltroBottom = bottomOverlayStart + 78;
 
   const uiTranslateY = animEntradaUi.interpolate({
     inputRange: [0, 1],
@@ -339,14 +367,44 @@ export default function MapScreen() {
     outputRange: [0.96, 1],
   });
 
+  const searchTranslateY = animSearchUi.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-16, 0],
+  });
+
+  const fabTranslateY = animFabUi.interpolate({
+    inputRange: [0, 1],
+    outputRange: [28, 0],
+  });
+
+  const fabScale = animFabUi.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.82, 1],
+  });
+
+  // SharedValue rastreado por @gorhom/bottom-sheet (Y del borde superior
+  // del sheet desde el tope de pantalla). El FAB se desplaza con la hoja
+  // manteniendo un gap visual constante.
+  const sheetPosition = useSharedValue(0);
+  const fabAnimStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      transform: [
+        { translateY: sheetPosition.value - FAB_VISUAL_EXTENT - 14 },
+      ],
+    };
+  });
+
   const mapPaddingNavegacion = useMemo(
     () => ({
-      top: topOverlayStart + TOP_ACTION_SIZE + 84,
+      top: topOverlayStart + 56 + 84,
       right: OVERLAY_SIDE_PADDING,
-      bottom: bottomOverlayStart + 86,
+      // Padding inferior compensa la mitad del sheet (snap medio ~50%) para
+      // que el marker del usuario quede centrado en el área de mapa visible.
+      bottom: reportCtaBottom + FAB_VISUAL_EXTENT + 16,
       left: OVERLAY_SIDE_PADDING,
     }),
-    [bottomOverlayStart, topOverlayStart],
+    [bottomOverlayStart, topOverlayStart, reportCtaBottom],
   );
 
   const animarCamaraNavegacion = useCallback(
@@ -378,11 +436,6 @@ export default function MapScreen() {
 
     const heading = normalizarAngulo(rumboRef.current);
     animarCamaraNavegacion(coords.latitude, coords.longitude, heading);
-    ultimoEstadoCamaraRef.current = {
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      heading,
-    };
   }, [animarCamaraNavegacion]);
 
   async function obtenerUbicacion() {
@@ -419,11 +472,6 @@ export default function MapScreen() {
     }
 
     animarCamaraNavegacion(lat, lng, rumboRef.current);
-    ultimoEstadoCamaraRef.current = {
-      latitude: lat,
-      longitude: lng,
-      heading: rumboRef.current,
-    };
     setCargandoUbicacion(false);
   }
 
@@ -441,6 +489,48 @@ export default function MapScreen() {
     }
   }, []);
 
+  // Quick-tiles dentro del BottomSheet (patrón Waze: Home / Work / +New).
+  // Orden por frecuencia de uso: Centrar primero por estar más a mano dentro
+  // del sheet expandido.
+  const quickTiles = useMemo<QuickTile[]>(
+    () => [
+      {
+        id: "center",
+        icono: "crosshairs-gps",
+        label: "Centrar",
+        onPress: enfocarCamaraUsuario,
+      },
+      {
+        id: "heatmap",
+        icono: "fire",
+        label: "Mapa calor",
+        activo: heatmapMode,
+        onPress: () => setHeatmapMode((v) => !v),
+      },
+      {
+        id: "modoSeguro",
+        icono: modoSeguroActivo ? "shield-check" : "shield-outline",
+        label: "Modo seguro",
+        activo: modoSeguroActivo,
+        onPress: toggleModoSeguro,
+      },
+      {
+        id: "filtros",
+        icono: "layers-triple-outline",
+        label: "Filtros",
+        activo: filtroVisible,
+        onPress: () => setFiltroVisible(true),
+      },
+    ],
+    [
+      enfocarCamaraUsuario,
+      heatmapMode,
+      filtroVisible,
+      modoSeguroActivo,
+      toggleModoSeguro,
+    ],
+  );
+
   useEffect(() => {
     void obtenerUbicacion();
   }, []);
@@ -454,16 +544,49 @@ export default function MapScreen() {
   useEffect(() => {
     if (cargandoUbicacion) {
       animEntradaUi.setValue(0);
+      animSearchUi.setValue(0);
+      animControlesUi.setValue(0);
+      animFabUi.setValue(0);
       return;
     }
 
+    // HUD aparece junto con la búsqueda (mismo "grupo superior").
     Animated.timing(animEntradaUi, {
       toValue: 1,
-      duration: 360,
+      duration: ENTRY_DURATION_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [animEntradaUi, cargandoUbicacion]);
+
+    // Entrada escalonada de los overlays primarios:
+    // búsqueda → controles laterales → FAB (jerarquía visual y atención).
+    Animated.stagger(ENTRY_STAGGER_MS, [
+      Animated.timing(animSearchUi, {
+        toValue: 1,
+        duration: ENTRY_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(animControlesUi, {
+        toValue: 1,
+        duration: ENTRY_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(animFabUi, {
+        toValue: 1,
+        duration: ENTRY_DURATION_MS,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [
+    animEntradaUi,
+    animSearchUi,
+    animControlesUi,
+    animFabUi,
+    cargandoUbicacion,
+  ]);
 
   useEffect(() => {
     if (debeMostrarListaSinGoogleMaps || cargandoUbicacion || errorUbicacion) {
@@ -562,65 +685,6 @@ export default function MapScreen() {
     };
   }, [cargandoUbicacion, debeMostrarListaSinGoogleMaps, errorUbicacion]);
 
-  useEffect(() => {
-    if (debeMostrarListaSinGoogleMaps || cargandoUbicacion || errorUbicacion) {
-      if (loopCamaraRef.current) {
-        clearInterval(loopCamaraRef.current);
-        loopCamaraRef.current = null;
-      }
-      return;
-    }
-
-    const renderizarCamara = () => {
-      const coords = coordsUsuarioRef.current;
-      if (!coords) return;
-
-      const heading = normalizarAngulo(rumboRef.current);
-      const ultimo = ultimoEstadoCamaraRef.current;
-
-      if (ultimo) {
-        const deltaPosicion = distanciaHaversine(
-          ultimo.latitude,
-          ultimo.longitude,
-          coords.latitude,
-          coords.longitude,
-        );
-        const deltaRumbo = diferenciaAngular(heading, ultimo.heading);
-
-        if (
-          deltaPosicion < UMBRAL_CAMBIO_POSICION_CAMARA_M &&
-          deltaRumbo < UMBRAL_CAMBIO_RUMBO_CAMARA_GRADOS
-        ) {
-          return;
-        }
-      }
-
-      animarCamaraNavegacion(coords.latitude, coords.longitude, heading);
-      ultimoEstadoCamaraRef.current = {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        heading,
-      };
-    };
-
-    renderizarCamara();
-    loopCamaraRef.current = setInterval(
-      renderizarCamara,
-      INTERVALO_RENDER_CAMARA_MS,
-    );
-
-    return () => {
-      if (loopCamaraRef.current) {
-        clearInterval(loopCamaraRef.current);
-        loopCamaraRef.current = null;
-      }
-    };
-  }, [
-    animarCamaraNavegacion,
-    cargandoUbicacion,
-    debeMostrarListaSinGoogleMaps,
-    errorUbicacion,
-  ]);
 
   // Mantener un ref con la lista actual para que el watcher (cuyo closure no se
   // rerenderiza) siempre vea reportes frescos al evaluar proximidad.
@@ -804,51 +868,18 @@ export default function MapScreen() {
           ))}
         </ScrollView>
       ) : (
-        <MapView
+        <MapaInteractivo
           ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.mapa}
           initialRegion={region}
           onMapReady={enfocarCamaraUsuario}
-          pitchEnabled
-          rotateEnabled
-          showsBuildings
-          showsUserLocation
           mapPadding={mapPaddingNavegacion}
-        >
-          {!heatmapMode &&
-            reportes.map((r) => {
-              const color = COLOR_POR_TIPO[r.tipo] ?? "#6B7280";
-              const icono = (ICONO_POR_TIPO[r.tipo] ?? "alert-circle") as Parameters<typeof MaterialCommunityIcons>[0]["name"];
-              return (
-                <Marker
-                  key={r.id}
-                  coordinate={{ latitude: r.latitud, longitude: r.longitud }}
-                  title={r.tipo.replace(/_/g, " ")}
-                  description={r.descripcion ?? undefined}
-                  tracksViewChanges={false}
-                >
-                  {/* Icono personalizado por tipo de reporte */}
-                  <View style={[styles.marcadorContenedor, { borderColor: color }]}>
-                    <View style={[styles.marcadorBurbuja, { backgroundColor: color }]}>
-                      <MaterialCommunityIcons name={icono} size={18} color="#fff" />
-                    </View>
-                    {/* Punta de la burbuja */}
-                    <View style={[styles.marcadorPunta, { borderTopColor: color }]} />
-                  </View>
-                </Marker>
-              );
-            })}
-
-          {heatmapMode && heatmapPoints.length > 0 && (
-            <Heatmap
-              gradient={HEATMAP_GRADIENT}
-              opacity={0.85}
-              points={heatmapPoints}
-              radius={70}
-            />
-          )}
-        </MapView>
+          reportes={reportes}
+          heatmapMode={heatmapMode}
+          heatmapPoints={heatmapPoints}
+          heatmapGradient={HEATMAP_GRADIENT}
+          colorPorTipo={COLOR_POR_TIPO}
+          iconoPorTipo={ICONO_POR_TIPO}
+        />
       )}
 
       {hudState && hudTone ? (
@@ -857,8 +888,7 @@ export default function MapScreen() {
           style={[
             styles.hudWrap,
             {
-              top: topOverlayStart + HUD_TOP_OFFSET,
-              right: HUD_RIGHT_RESERVE,
+              top: topOverlayStart + 4,
               borderColor: hudTone.borderColor,
               opacity: animEntradaUi,
               transform: [{ translateY: uiTranslateY }, { scale: uiScale }],
@@ -886,135 +916,62 @@ export default function MapScreen() {
         </Animated.View>
       ) : null}
 
+      {/* Botón menú flotante (top-left) — patrón Waze: card 48×48 sólo
+          con el hamburguer, deja todo el ancho superior libre. */}
       <Animated.View
         style={[
-          styles.fabIzq,
+          styles.menuFlotanteWrap,
           {
             top: topOverlayStart,
-            opacity: animEntradaUi,
-            transform: [{ translateY: uiTranslateY }, { scale: uiScale }],
+            opacity: animSearchUi,
+            transform: [{ translateY: searchTranslateY }],
           },
         ]}
       >
         <Pressable
-          accessibilityLabel="Menú lateral"
+          accessibilityLabel="Abrir menú"
           accessibilityRole="button"
-          style={styles.fabChico}
+          android_ripple={{
+            color: "rgba(15,23,42,0.10)",
+            borderless: true,
+            radius: 24,
+          }}
+          hitSlop={8}
           onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          style={({ pressed }) => [
+            styles.menuFlotanteBtn,
+            pressed && styles.menuFlotantePressed,
+          ]}
         >
           <MaterialCommunityIcons color={colors.text} name="menu" size={24} />
         </Pressable>
       </Animated.View>
 
-      <Animated.View
-        style={[
-          styles.fabFila,
-          styles.fabFilaGap,
-          {
-            top: topOverlayStart,
-            opacity: animEntradaUi,
-            transform: [{ translateY: uiTranslateY }, { scale: uiScale }],
-          },
-        ]}
+      {/* BottomSheet primero en el árbol para que el FAB (siguiente)
+          siempre dibuje por encima en cualquier snap. */}
+      <BottomSheetAccesos
+        animatedPosition={sheetPosition}
+        colorPorTipo={COLOR_POR_TIPO}
+        iconoPorTipo={ICONO_POR_TIPO}
+        quickTiles={quickTiles}
+        reportes={reportes}
+      />
+
+      {/* FAB Reportar — tracking de la posición animada del bottom sheet
+          vía Reanimated (sube/baja con la hoja). */}
+      <ReanimatedView.View
+        style={[styles.fabReportarWrap, fabAnimStyle]}
+        pointerEvents="box-none"
       >
-        <Pressable
-          accessibilityLabel="Actualizar reportes"
-          accessibilityRole="button"
-          style={styles.fab}
-          onPress={() => {
-            void cargarReportes();
-            void cargarHotspots(filtro);
+        <Animated.View
+          style={{
+            opacity: animFabUi,
+            transform: [{ translateY: fabTranslateY }, { scale: fabScale }],
           }}
         >
-          <MaterialCommunityIcons
-            color={colors.text}
-            name="refresh"
-            size={22}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityLabel={
-            heatmapMode ? "Ocultar puntos criticos" : "Mostrar puntos criticos"
-          }
-          accessibilityRole="button"
-          accessibilityState={{ selected: heatmapMode }}
-          style={[styles.fab, heatmapMode && styles.fabActive]}
-          onPress={() => setHeatmapMode((v) => !v)}
-        >
-          <MaterialCommunityIcons
-            color={heatmapMode ? "#fff" : colors.text}
-            name="fire"
-            size={22}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityLabel="Filtrar puntos criticos"
-          accessibilityRole="button"
-          style={[styles.fab, filtroVisible && styles.fabActive]}
-          onPress={() => setFiltroVisible(true)}
-        >
-          <MaterialCommunityIcons
-            color={filtroVisible ? "#fff" : colors.text}
-            name="layers-triple-outline"
-            size={22}
-          />
-        </Pressable>
-      </Animated.View>
-
-      {heatmapMode && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.chipFiltro,
-            {
-              bottom: chipFiltroBottom,
-              opacity: animEntradaUi,
-              transform: [{ translateY: uiTranslateY }],
-            },
-          ]}
-        >
-          <MaterialCommunityIcons
-            color="#fff"
-            name="filter-variant"
-            size={14}
-          />
-          <Text style={styles.chipFiltroTxt}>{etiquetaFiltro(filtro)}</Text>
+          <FabReportar habilitado={!!token} onPress={pulsarNuevoReporte} />
         </Animated.View>
-      )}
-
-      <Animated.View
-        style={{
-          opacity: animEntradaUi,
-          transform: [{ translateY: uiTranslateY }, { scale: uiScale }],
-        }}
-      >
-        <Pressable
-          accessibilityLabel={
-            token
-              ? "Reportar incidente"
-              : "Reportar incidente (requiere cuenta)"
-          }
-          accessibilityRole="button"
-          style={[
-            styles.fabMas,
-            { bottom: reportCtaBottom },
-            !token && styles.fabMasInvitado,
-          ]}
-          onPress={pulsarNuevoReporte}
-        >
-          <MaterialCommunityIcons
-            color="#fff"
-            name="alert-circle-outline"
-            size={22}
-          />
-          <View style={styles.fabMasTxtWrap}>
-            <Text style={styles.fabMasTit}>Reportar</Text>
-            <Text style={styles.fabMasSub}>incidente</Text>
-          </View>
-        </Pressable>
-      </Animated.View>
+      </ReanimatedView.View>
 
       <FiltroHotspotsSheet
         initialFilter={filtro}
@@ -1050,38 +1007,40 @@ export default function MapScreen() {
         reporte={vigenciaPendiente}
       />
 
-      {/* ── Botón Modo Seguro ────────────────────────────────────────────── */}
-      <Animated.View
-        pointerEvents="box-none"
-        style={[
-          styles.modoSeguroWrap,
-          {
-            bottom: bottomOverlayStart,
-            opacity: animEntradaUi,
-            transform: [{ translateY: uiTranslateY }, { scale: pulso }],
-          },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel={
-            modoSeguroActivo ? "Desactivar Modo Seguro" : "Activar Modo Seguro"
-          }
-          accessibilityRole="button"
-          accessibilityState={{ selected: modoSeguroActivo }}
+      {toastMensaje ? (
+        <Animated.View
+          accessibilityLiveRegion="polite"
+          pointerEvents="none"
           style={[
-            styles.modoSeguroBtn,
-            modoSeguroActivo && styles.modoSeguroBtnActivo,
+            styles.toast,
+            {
+              bottom:
+                reportCtaBottom +
+                FAB_VISUAL_EXTENT +
+                FAB_TO_CONTROLES_GAP +
+                14,
+              opacity: animToast,
+              transform: [
+                {
+                  translateY: animToast.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [10, 0],
+                  }),
+                },
+              ],
+            },
           ]}
-          onPress={toggleModoSeguro}
         >
           <MaterialCommunityIcons
             color="#fff"
-            name={modoSeguroActivo ? "shield-check" : "shield-outline"}
-            size={20}
+            name="shield-check"
+            size={16}
           />
-          <Text style={styles.modoSeguroTxt}>MODO SEGURO</Text>
-        </Pressable>
-      </Animated.View>
+          <Text numberOfLines={2} style={styles.toastTxt}>
+            {toastMensaje}
+          </Text>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -1129,21 +1088,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   textoGris: { color: colors.textMuted, fontSize: 14 },
+  // Píldora compacta top-right — equivalente a la insignia rosa de música
+  // en Waze; sólo aparece cuando hay un modo activo (heatmap / Modo Seguro).
   hudWrap: {
     position: "absolute",
-    left: OVERLAY_SIDE_PADDING,
+    right: OVERLAY_SIDE_PADDING,
     zIndex: 2,
-    maxWidth: 248,
+    maxWidth: 232,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(255,255,255,0.90)",
-    borderRadius: 16,
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderRadius: radii.pill,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderWidth: 1,
     borderColor: "rgba(214,225,235,0.82)",
-    ...shadow.card,
+    ...shadow.overlay,
   },
   hudIconWrap: {
     width: 30,
@@ -1190,96 +1151,56 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   badgeCargaTxt: { fontSize: 13, color: colors.textMuted },
-  fabIzq: {
+  menuFlotanteWrap: {
     position: "absolute",
-    left: 16,
-    zIndex: 3,
+    left: OVERLAY_SIDE_PADDING,
+    zIndex: 4,
   },
-  fabChico: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(255,255,255,0.94)",
-    borderWidth: 1,
-    borderColor: "rgba(214,225,235,0.82)",
+  menuFlotanteBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: "rgba(255,255,255,0.98)",
     alignItems: "center",
     justifyContent: "center",
-    ...shadow.floating,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(214,225,235,0.85)",
+    ...shadow.overlay,
   },
-  fabFila: {
+  menuFlotantePressed: {
+    opacity: 0.7,
+  },
+  // FAB Reportar — anclado en el origen (top:0) y desplazado por Reanimated
+  // siguiendo el borde superior del bottom sheet.
+  fabReportarWrap: {
     position: "absolute",
-    right: 16,
-    zIndex: 3,
+    right: OVERLAY_SIDE_PADDING - 2,
+    top: 0,
+    zIndex: 4,
   },
-  fab: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(255,255,255,0.94)",
-    borderWidth: 1,
-    borderColor: "rgba(214,225,235,0.82)",
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow.floating,
-  },
-  fabFilaGap: { gap: 12 },
-  fabActive: {
-    backgroundColor: colors.primary,
-    borderColor: "rgba(14,165,164,0.68)",
-  },
-  chipFiltro: {
+  toast: {
     position: "absolute",
-    bottom: 110,
+    left: OVERLAY_SIDE_PADDING,
+    right: OVERLAY_SIDE_PADDING,
     alignSelf: "center",
+    maxWidth: 360,
+    marginHorizontal: "auto",
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(14,165,164,0.96)",
-    ...shadow.card,
-    zIndex: 2,
-  },
-  chipFiltroTxt: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-  },
-  fabMas: {
-    position: "absolute",
-    left: 20,
-    bottom: 36,
-    width: 112,
-    height: 82,
-    borderRadius: 24,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    paddingHorizontal: 10,
+    gap: 8,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    ...shadow.floating,
-    zIndex: 3,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(15,23,42,0.92)",
+    zIndex: 5,
+    ...shadow.overlay,
   },
-  fabMasInvitado: { opacity: 0.75 },
-  fabMasTxtWrap: {
-    alignItems: "center",
-  },
-  fabMasTit: {
+  toastTxt: {
+    flex: 1,
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "600",
     letterSpacing: 0.2,
-  },
-  fabMasSub: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 1,
   },
   listaSinMapaContenido: { padding: 16, paddingBottom: 120, gap: 8 },
   listaSinMapaTitulo: { fontSize: 18, fontWeight: "700", color: colors.text },
@@ -1311,30 +1232,4 @@ const styles = StyleSheet.create({
   },
   filaMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   filaDesc: { fontSize: 14, color: colors.text, marginTop: 6 },
-  modoSeguroWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    zIndex: 4,
-  },
-  modoSeguroBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: "rgba(15,23,42,0.93)",
-    ...shadow.floating,
-  },
-  modoSeguroBtnActivo: {
-    backgroundColor: "#16a34a",
-  },
-  modoSeguroTxt: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
 });

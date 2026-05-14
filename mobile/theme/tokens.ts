@@ -50,6 +50,14 @@ export const shadow = {
     shadowRadius: 10,
     elevation: 7,
   },
+  // Sombra reforzada para flotantes sobre el mapa (mayor contraste contra cartografía).
+  overlay: {
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 9,
+  },
 } as const;
 
 export const iosTitleFont = Platform.select({

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -18,9 +18,9 @@ class AuthServiceError(Exception):
 @dataclass
 class AuthSession:
     access_token: str
-    refresh_token: str | None
+    refresh_token: Optional[str]
     expires_in: int
-    usuario: dict[str, str | None]
+    usuario: dict[str, Optional[str]]
 
 
 def _settings():
@@ -55,8 +55,8 @@ def _supabase_request(
     method: str,
     path: str,
     *,
-    json_body: dict[str, Any] | None = None,
-    access_token: str | None = None,
+    json_body: Optional[dict[str, Any]] = None,
+    access_token: Optional[str] = None,
 ) -> dict[str, Any]:
     headers = {
         "apikey": _anon_key(),
@@ -95,7 +95,7 @@ def _supabase_request(
     return data
 
 
-def _normalizar_usuario(raw_user: Any) -> dict[str, str | None]:
+def _normalizar_usuario(raw_user: Any) -> dict[str, Optional[str]]:
     if not isinstance(raw_user, dict):
         raise AuthServiceError(502, "No se recibió información de usuario desde autenticación")
 
@@ -169,7 +169,7 @@ def refresh(refresh_token: str) -> AuthSession:
     return _normalizar_sesion(payload)
 
 
-def get_user(access_token: str) -> dict[str, str | None]:
+def get_user(access_token: str) -> dict[str, Optional[str]]:
     payload = _supabase_request("GET", "/user", access_token=access_token)
     return _normalizar_usuario(payload)
 

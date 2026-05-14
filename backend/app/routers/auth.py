@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -37,7 +37,7 @@ def _auth_cookie_kwargs() -> dict[str, object]:
     return kwargs
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str | None) -> None:
+def _set_refresh_cookie(response: Response, refresh_token: Optional[str]) -> None:
     if not refresh_token:
         raise HTTPException(status_code=502, detail="No se recibió refresh token del proveedor de auth")
     response.set_cookie(
@@ -72,7 +72,7 @@ def _raise_service_error(exc: auth_service.AuthServiceError) -> None:
 
 
 def _extraer_access_token(
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer)],
 ) -> str:
     if creds is None or (creds.scheme or "").lower() != "bearer" or not creds.credentials.strip():
         raise HTTPException(
@@ -147,7 +147,7 @@ def me(access_token: str = Depends(_extraer_access_token)):
 def logout(
     response: Response,
     payload: LogoutIn = LogoutIn(),
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
+    creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer)] = None,
 ):
     access_token = None
     if creds is not None and (creds.scheme or "").lower() == "bearer" and creds.credentials.strip():

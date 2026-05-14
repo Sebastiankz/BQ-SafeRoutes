@@ -58,3 +58,5 @@ firebase-credentials.json
 
 *.md
 .mcp.json
+skills-lock.json
+.agents
