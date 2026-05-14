@@ -1,11 +1,13 @@
 import { forwardRef } from "react";
 import type { Ref } from "react";
-import MapView, { Heatmap, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Heatmap, Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import type { MapViewProps, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
 
 import type { Reporte } from "../../services/reportes";
+import type { LatLng } from "../../services/maps";
+import { colors } from "../../theme/tokens";
 
 export type HeatmapPoint = {
   latitude: number;
@@ -28,9 +30,10 @@ export interface MapaInteractivoProps
   heatmapGradient: HeatmapGradient;
   colorPorTipo: Record<string, string>;
   iconoPorTipo: Record<string, string>;
+  rutaPolyline?: LatLng[];
+  destinoCoords?: LatLng | null;
 }
 
-// Shell — paso 2 trasladará aquí la lógica completa del <MapView>.
 function MapaInteractivoBase(
   {
     initialRegion,
@@ -42,6 +45,8 @@ function MapaInteractivoBase(
     heatmapGradient,
     colorPorTipo,
     iconoPorTipo,
+    rutaPolyline,
+    destinoCoords,
   }: MapaInteractivoProps,
   ref: Ref<MapView>,
 ) {
@@ -91,6 +96,32 @@ function MapaInteractivoBase(
           radius={70}
         />
       )}
+
+      {rutaPolyline && rutaPolyline.length > 1 && (
+        <Polyline
+          coordinates={rutaPolyline}
+          strokeColor={colors.primary}
+          strokeWidth={5}
+          zIndex={10}
+          lineCap="round"
+          lineJoin="round"
+        />
+      )}
+
+      {destinoCoords && (
+        <Marker
+          coordinate={destinoCoords}
+          tracksViewChanges={false}
+          zIndex={20}
+        >
+          <View style={styles.marcadorDestino}>
+            <View style={styles.marcadorDestinoBurbuja}>
+              <MaterialCommunityIcons name="map-marker" size={22} color="#fff" />
+            </View>
+            <View style={styles.marcadorDestinoPunta} />
+          </View>
+        </Marker>
+      )}
     </MapView>
   );
 }
@@ -130,6 +161,35 @@ const styles = StyleSheet.create({
     borderTopWidth: 8,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
+    marginTop: -1,
+  },
+  marcadorDestino: {
+    alignItems: "center",
+  },
+  marcadorDestinoBurbuja: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent,
+    borderWidth: 2.5,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  marcadorDestinoPunta: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderTopWidth: 10,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: colors.accent,
     marginTop: -1,
   },
 });

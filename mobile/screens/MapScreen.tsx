@@ -40,6 +40,9 @@ import type { Reporte } from "../services/reportes";
 import { responderVigencia } from "../services/reportes";
 import { useReportesLive } from "../hooks/useReportesLive";
 import { colors, iosTitleFont, radii, shadow } from "../theme/tokens";
+import BuscarDireccionModal from "../components/map/BuscarDireccionModal";
+import type { LugarSugerido, LatLng as MapLatLng } from "../services/maps";
+import { obtenerCoordenadasLugar, obtenerRuta } from "../services/maps";
 
 type DrawerNav = DrawerNavigationProp<RootDrawerParamList>;
 
@@ -203,6 +206,10 @@ export default function MapScreen() {
 
   // ── Toast efímero (feedback para acciones laterales como Modo Seguro) ──
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+  const [modalBusquedaVisible, setModalBusquedaVisible] = useState(false);
+  const [destinoCoords, setDestinoCoords] = useState<MapLatLng | null>(null);
+  const [rutaPolyline, setRutaPolyline] = useState<MapLatLng[]>([]);
+  const [buscandoRuta, setBuscandoRuta] = useState(false);
   const animToast = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -624,7 +631,6 @@ export default function MapScreen() {
 
         seguimientoCamaraRef.current = subscription;
       } catch {
-        // Si falla el seguimiento continuo, dejamos la cámara fija en la última posición.
       }
     })();
 
@@ -793,6 +799,33 @@ export default function MapScreen() {
     setHeatmapMode(true);
   }
 
+  const handleSeleccionarDestino = useCallback(
+    async (lugar: LugarSugerido) => {
+      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+      const origen = coordsUsuarioRef.current ?? {
+        latitude: region.latitude,
+        longitude: region.longitude,
+      };
+      setBuscandoRuta(true);
+      try {
+        const destino = await obtenerCoordenadasLugar(lugar.placeId, apiKey);
+        const puntos = await obtenerRuta(origen, destino, apiKey);
+        setDestinoCoords(destino);
+        setRutaPolyline(puntos);
+        mapRef.current?.fitToCoordinates([origen, ...puntos, destino], {
+          edgePadding: { top: 80, right: 40, bottom: 240, left: 40 },
+          animated: true,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        Alert.alert("No se pudo trazar la ruta", msg);
+      } finally {
+        setBuscandoRuta(false);
+      }
+    },
+    [region.latitude, region.longitude],
+  );
+
   if (cargandoUbicacion) {
     return (
       <View style={styles.centrado}>
@@ -822,13 +855,15 @@ export default function MapScreen() {
         </View>
       )}
 
-      {(cargandoReportes || cargandoHotspots) && !errorReportes && (
+      {(cargandoReportes || cargandoHotspots || buscandoRuta) && !errorReportes && (
         <View style={[styles.badgeCarga, { top: topOverlayStart }]}>
           <ActivityIndicator size="small" color={colors.primary} />
           <Text style={styles.badgeCargaTxt}>
-            {cargandoHotspots
-              ? "Cargando puntos criticos…"
-              : "Cargando reportes…"}
+            {buscandoRuta
+              ? "Trazando ruta…"
+              : cargandoHotspots
+                ? "Cargando puntos criticos…"
+                : "Cargando reportes…"}
           </Text>
         </View>
       )}
@@ -879,6 +914,8 @@ export default function MapScreen() {
           heatmapGradient={HEATMAP_GRADIENT}
           colorPorTipo={COLOR_POR_TIPO}
           iconoPorTipo={ICONO_POR_TIPO}
+          rutaPolyline={rutaPolyline}
+          destinoCoords={destinoCoords}
         />
       )}
 
@@ -955,6 +992,7 @@ export default function MapScreen() {
         iconoPorTipo={ICONO_POR_TIPO}
         quickTiles={quickTiles}
         reportes={reportes}
+        onPressSearch={() => setModalBusquedaVisible(true)}
       />
 
       {/* FAB Reportar — tracking de la posición animada del bottom sheet
@@ -1005,6 +1043,27 @@ export default function MapScreen() {
         onDismiss={cerrarVigencia}
         onResponder={onResponderVigencia}
         reporte={vigenciaPendiente}
+      />
+
+      {destinoCoords && (
+        <Pressable
+          onPress={() => {
+            setDestinoCoords(null);
+            setRutaPolyline([]);
+          }}
+          style={[styles.cancelarRutaChip, { bottom: reportCtaBottom + FAB_VISUAL_EXTENT + FAB_TO_CONTROLES_GAP + 10 }]}
+        >
+          <MaterialCommunityIcons color="#fff" name="close" size={14} />
+          <Text style={styles.cancelarRutaTxt}>Cancelar ruta</Text>
+        </Pressable>
+      )}
+
+      <BuscarDireccionModal
+        apiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? ""}
+        userLocation={coordsUsuario ?? undefined}
+        onClose={() => setModalBusquedaVisible(false)}
+        onSelectLugar={handleSeleccionarDestino}
+        visible={modalBusquedaVisible}
       />
 
       {toastMensaje ? (
@@ -1232,4 +1291,25 @@ const styles = StyleSheet.create({
   },
   filaMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   filaDesc: { fontSize: 14, color: colors.text, marginTop: 6 },
+
+  cancelarRutaChip: {
+    position: "absolute",
+    alignSelf: "center",
+    left: "50%",
+    transform: [{ translateX: -70 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primaryDark,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+    zIndex: 10,
+    ...shadow.floating,
+  },
+  cancelarRutaTxt: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
