@@ -32,6 +32,8 @@ export interface MapaInteractivoProps
   iconoPorTipo: Record<string, string>;
   rutaPolyline?: LatLng[];
   destinoCoords?: LatLng | null;
+  userCoords?: LatLng | null;
+  userHeading?: number;
 }
 
 function MapaInteractivoBase(
@@ -47,6 +49,8 @@ function MapaInteractivoBase(
     iconoPorTipo,
     rutaPolyline,
     destinoCoords,
+    userCoords,
+    userHeading = 0,
   }: MapaInteractivoProps,
   ref: Ref<MapView>,
 ) {
@@ -60,7 +64,7 @@ function MapaInteractivoBase(
       pitchEnabled={false}
       rotateEnabled
       showsBuildings
-      showsUserLocation
+      showsUserLocation={false}
       showsMyLocationButton={false}
       showsCompass={false}
       followsUserLocation={false}
@@ -122,10 +126,37 @@ function MapaInteractivoBase(
           </View>
         </Marker>
       )}
-    </MapView>
-  );
-}
 
+      {userCoords && (
+        <Marker
+          coordinate={userCoords}
+          anchor={{ x: 0.5, y: 0.5 }}
+          flat
+          rotation={userHeading}
+          tracksViewChanges={false}
+          zIndex={30}
+        >
+          <View style={styles.usuarioContenedor}>
+            {/* Capa blanca — crea el borde/glow de contraste */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <MaterialCommunityIcons
+                name="navigation"
+                size={48}
+                color="rgba(255,255,255,0.96)"
+              />
+            </View>
+            {/* Flecha principal */}
+            <MaterialCommunityIcons
+              name="navigation"
+              size={36}
+              color={colors.primary}
+            />
+          </View>
+        </Marker>
+      )}
+    </MapView>
+  )
+};
 const MapaInteractivo = forwardRef<MapView, MapaInteractivoProps>(
   MapaInteractivoBase,
 );
@@ -191,5 +222,16 @@ const styles = StyleSheet.create({
     borderRightColor: "transparent",
     borderTopColor: colors.accent,
     marginTop: -1,
+  },
+  usuarioContenedor: {
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 7,
+    elevation: 12,
   },
 });

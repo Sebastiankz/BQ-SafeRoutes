@@ -212,6 +212,8 @@ export default function MapScreen() {
   const [buscandoRuta, setBuscandoRuta] = useState(false);
   const animToast = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [userHeading, setUserHeading] = useState(0);
+
 
   const mostrarToast = useCallback(
     (mensaje: string) => {
@@ -620,7 +622,9 @@ export default function MapScreen() {
 
             if (typeof heading === "number" && heading >= 0) {
               rumboRef.current = normalizarAngulo(heading);
+              setUserHeading(normalizarAngulo(heading));
             }
+
           },
         );
 
@@ -671,6 +675,7 @@ export default function MapScreen() {
           }
 
           rumboRef.current = normalizado;
+          setUserHeading(normalizado);
         });
 
         if (cancelado) {
@@ -916,6 +921,8 @@ export default function MapScreen() {
           iconoPorTipo={ICONO_POR_TIPO}
           rutaPolyline={rutaPolyline}
           destinoCoords={destinoCoords}
+          userCoords={coordsUsuario}
+          userHeading={userHeading}
         />
       )}
 
