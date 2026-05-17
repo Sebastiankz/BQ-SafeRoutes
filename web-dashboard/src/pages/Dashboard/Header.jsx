@@ -1,22 +1,36 @@
-import { Activity, Moon, Sun } from "lucide-react";
-import { Select, ListBox } from "@heroui/react";
+import { Moon, Sun, ShieldAlert } from "lucide-react";
+import PillSelect from "../../components/ui/PillSelect";
+import StatusDot from "../../components/ui/StatusDot";
 
-const AÑOS = ["Todos", 2022, 2023, 2024, 2025];
-const GRAVEDADES = ["Todas", "Solo Daños", "Heridos", "Muertos"];
+const AÑOS = [
+  { value: "Todos", label: "Todos los años" },
+  { value: 2022, label: "2022" },
+  { value: 2023, label: "2023" },
+  { value: 2024, label: "2024" },
+  { value: 2025, label: "2025" },
+];
+
+const GRAVEDADES = [
+  { value: "Todas", label: "Todas" },
+  { value: "Solo Daños", label: "Solo Daños" },
+  { value: "Heridos", label: "Heridos" },
+  { value: "Muertos", label: "Muertos" },
+];
+
 const MESES = [
-  { id: "Todos", label: "Todos" },
-  { id: "1", label: "Enero" },
-  { id: "2", label: "Febrero" },
-  { id: "3", label: "Marzo" },
-  { id: "4", label: "Abril" },
-  { id: "5", label: "Mayo" },
-  { id: "6", label: "Junio" },
-  { id: "7", label: "Julio" },
-  { id: "8", label: "Agosto" },
-  { id: "9", label: "Septiembre" },
-  { id: "10", label: "Octubre" },
-  { id: "11", label: "Noviembre" },
-  { id: "12", label: "Diciembre" },
+  { value: "Todos", label: "Todos los meses" },
+  { value: "1", label: "Enero" },
+  { value: "2", label: "Febrero" },
+  { value: "3", label: "Marzo" },
+  { value: "4", label: "Abril" },
+  { value: "5", label: "Mayo" },
+  { value: "6", label: "Junio" },
+  { value: "7", label: "Julio" },
+  { value: "8", label: "Agosto" },
+  { value: "9", label: "Septiembre" },
+  { value: "10", label: "Octubre" },
+  { value: "11", label: "Noviembre" },
+  { value: "12", label: "Diciembre" },
 ];
 
 export default function Header({
@@ -31,131 +45,92 @@ export default function Header({
   mostrarGravedad = true,
 }) {
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
-      {/* Lado izquierdo: logo + título */}
-      <div className="flex items- gap-3">
-        <div className="bg-blue-600 text-white p-2 rounded-lg">
-          <Activity size={20} />
+    <header
+      className="
+        h-[52px] shrink-0 bg-[var(--surface)]
+        border-b border-[var(--border)]
+        px-5 flex items-center justify-between gap-4
+      "
+    >
+      {/* Brand */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="
+            w-9 h-9 rounded-xl bg-[var(--accent)]
+            flex items-center justify-center
+            shadow-[var(--shadow-glow)] shrink-0
+          "
+        >
+          <ShieldAlert size={18} strokeWidth={2.2} className="text-white" />
         </div>
-        <div>
-          <h1 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
-            Monitor Vial Barranquilla
+        <div className="min-w-0 leading-tight">
+          <h1 className="text-[15px] font-bold text-[var(--text-primary)] font-display tracking-tight">
+            Monitor Vial
+            <span className="text-[var(--text-tertiary)] font-medium"> · Barranquilla</span>
           </h1>
-          <p className="text-xs text-slate-400 dark:text-gray-400 tracking-widest uppercase">
-            Plataforma de Prevención de Riesgos ·{" "}
-            {año === "Todos" ? "2022 – 2025" : año}
+          <p className="text-[10px] font-medium text-[var(--text-tertiary)] font-mono uppercase tracking-[0.12em]">
+            Plataforma de Prevención · 2025
           </p>
         </div>
       </div>
 
-      {/* Lado derecho: filtros + toggle */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Filtro Gravedad — oculto en vistas que no lo usan */}
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <div className="hidden md:flex items-center mr-2">
+          <StatusDot tone="ok" label="Sistema activo" />
+        </div>
+
         {mostrarGravedad && (
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
-              Gravedad
-            </span>
-            <Select
-              className="w-36"
-              placeholder="Gravedad"
-              selectedKey={gravedad}
-              onSelectionChange={(key) => {
-                const val = key instanceof Set ? [...key][0] : key;
-                if (val != null) setGravedad(String(val));
-              }}
-            >
-              <Select.Trigger>
-                <Select.Value />
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox>
-                  {GRAVEDADES.map((g) => (
-                    <ListBox.Item key={g} id={g} textValue={g}>
-                      {g}
-                      <ListBox.ItemIndicator />
-                    </ListBox.Item>
-                  ))}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-          </div>
+          <PillSelect
+            label="Gravedad"
+            value={gravedad}
+            options={GRAVEDADES}
+            onChange={(v) => setGravedad(String(v))}
+          />
         )}
+        <PillSelect
+          label="Período"
+          value={año}
+          options={AÑOS}
+          onChange={(v) => setAño(v === "Todos" ? "Todos" : Number(v))}
+        />
+        <PillSelect
+          label="Mes"
+          value={mes}
+          options={MESES}
+          onChange={(v) => setMes(String(v))}
+        />
 
-        {/* Filtro Año */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
-            Período
-          </span>
-          <Select
-            className="w-28"
-            placeholder="Período"
-            selectedKey={String(año)}
-            onSelectionChange={(key) => {
-              const val = key instanceof Set ? [...key][0] : key;
-              if (val != null) setAño(val === "Todos" ? "Todos" : Number(val));
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {AÑOS.map((a) => (
-                  <ListBox.Item
-                    key={String(a)}
-                    id={String(a)}
-                    textValue={String(a)}
-                  >
-                    {String(a)}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-
-        {/* Filtro Mes */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:block text-xs font-semibold text-slate-500 dark:text-gray-400">
-            Mes
-          </span>
-          <Select
-            className="w-36"
-            placeholder="Mes"
-            selectedKey={String(mes)}
-            onSelectionChange={(key) => {
-              const val = key instanceof Set ? [...key][0] : key;
-              if (val != null) setMes(String(val));
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {MESES.map((m) => (
-                  <ListBox.Item key={m.id} id={m.id} textValue={m.label}>
-                    {m.label}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-
-        {/* Toggle dark mode */}
         <button
+          type="button"
           onClick={() => setIsDark(!isDark)}
-          className="p-2 rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           title={isDark ? "Modo claro" : "Modo oscuro"}
+          aria-label="Cambiar tema"
+          className="
+            ml-1 w-9 h-9 rounded-full
+            bg-[var(--surface-muted)] border border-[var(--border)]
+            text-[var(--text-secondary)]
+            hover:text-[var(--accent)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent-tint)]
+            flex items-center justify-center cursor-pointer
+            transition-all duration-200 ring-focus
+          "
         >
-          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          <span className="relative w-4 h-4">
+            <Sun
+              size={16}
+              strokeWidth={2.1}
+              className={`absolute inset-0 transition-all duration-300 ${
+                isDark ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"
+              }`}
+            />
+            <Moon
+              size={16}
+              strokeWidth={2.1}
+              className={`absolute inset-0 transition-all duration-300 ${
+                isDark ? "opacity-0 rotate-90" : "opacity-100 rotate-0"
+              }`}
+            />
+          </span>
         </button>
       </div>
     </header>

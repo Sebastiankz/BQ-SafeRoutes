@@ -1,20 +1,23 @@
 // src/pages/Dashboard/ReporteFeed.jsx
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Chip } from "@heroui/react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
   Bell,
   Camera,
   Clock,
-  ExternalLink,
+  FileText,
   MapPin,
-  Navigation,
+  Navigation2,
+  Radio,
   Timer,
   X,
   Zap,
 } from "lucide-react";
+import StatusDot from "../../components/ui/StatusDot";
 
+// ─── Constants ────────────────────────────────────────────────
 const TIPO_LABEL = {
   accidente: "Accidente",
   hueco: "Hueco peligroso",
@@ -23,20 +26,20 @@ const TIPO_LABEL = {
   otro: "Otro",
 };
 
-const TIPO_ICONO = {
-  accidente: "nav",
-  hueco: "alert",
-  arroyo: "alert",
-  semaforo_danado: "zap",
-  otro: "timer",
+const TIPO_ICON = {
+  accidente: Navigation2,
+  hueco: AlertTriangle,
+  arroyo: AlertTriangle,
+  semaforo_danado: Zap,
+  otro: Timer,
 };
 
-const TIPO_COLOR = {
-  accidente: "text-red-500",
-  hueco: "text-orange-500",
-  arroyo: "text-blue-500",
-  semaforo_danado: "text-yellow-500",
-  otro: "text-slate-500",
+const TIPO_TONE = {
+  accidente: { text: "text-[var(--crit)]", bg: "bg-[var(--crit-tint)]", border: "border-[var(--crit)]/25" },
+  hueco: { text: "text-[var(--warn)]", bg: "bg-[var(--warn-tint)]", border: "border-[var(--warn)]/25" },
+  arroyo: { text: "text-[var(--accent)]", bg: "bg-[var(--accent-tint)]", border: "border-[var(--accent)]/25" },
+  semaforo_danado: { text: "text-[var(--warn)]", bg: "bg-[var(--warn-tint)]", border: "border-[var(--warn)]/25" },
+  otro: { text: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-muted)]", border: "border-[var(--border)]" },
 };
 
 const SEVERIDAD_PRIORIDAD = {
@@ -47,306 +50,286 @@ const SEVERIDAD_PRIORIDAD = {
   5: "Crítica",
 };
 
-const ESTADO_CONFIG = {
-  pendiente: {
-    label: "Pendiente",
-    dot: "text-orange-400",
-    badge:
-      "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  },
-  confirmado: {
-    label: "Confirmado",
-    dot: "text-emerald-500",
-    badge:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  },
-  inactivo: {
-    label: "Inactivo",
-    dot: "text-slate-400",
-    badge: "bg-slate-100 text-slate-500 dark:bg-gray-700 dark:text-gray-400",
-  },
+const ESTADO_TONE = {
+  pendiente: "warn",
+  confirmado: "ok",
+  inactivo: "muted",
 };
 
+const PRIORIDAD_STYLES = {
+  Crítica: "bg-[var(--crit-tint)] text-[var(--crit)] border-[var(--crit)]/30",
+  Alta: "bg-[var(--warn-tint)] text-[var(--warn)] border-[var(--warn)]/30",
+  Media: "bg-[var(--accent-tint)] text-[var(--accent)] border-[var(--accent)]/30",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────
 function tiempoRelativo(iso) {
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (diff < 60) return `${diff} seg`;
+  if (diff < 60) return `${diff}s`;
   if (diff < 3600) return `${Math.floor(diff / 60)} min`;
-  if (diff < 86400)
-    return `${Math.floor(diff / 3600)} hora${Math.floor(diff / 3600) > 1 ? "s" : ""}`;
-  return `${Math.floor(diff / 86400)} día${Math.floor(diff / 86400) > 1 ? "s" : ""}`;
+  if (diff < 86400) {
+    const h = Math.floor(diff / 3600);
+    return `${h} h`;
+  }
+  const d = Math.floor(diff / 86400);
+  return `${d} d`;
 }
 
 function adaptarReporte(r) {
-  const estado = ESTADO_CONFIG[r.estado] ?? ESTADO_CONFIG.pendiente;
+  const tipoKey = r.tipo ?? "otro";
   return {
     id: r.id,
-    tipo: TIPO_LABEL[r.tipo] ?? r.tipo,
-    icono: TIPO_ICONO[r.tipo] ?? "timer",
-    color: TIPO_COLOR[r.tipo] ?? "text-slate-500",
+    tipoKey,
+    tipo: TIPO_LABEL[tipoKey] ?? tipoKey,
+    Icon: TIPO_ICON[tipoKey] ?? Timer,
+    tone: TIPO_TONE[tipoKey] ?? TIPO_TONE.otro,
     direccion:
-      r.direccion ?? `${r.latitud.toFixed(4)}, ${r.longitud.toFixed(4)}`,
+      r.direccion ?? `${r.latitud?.toFixed(4)}, ${r.longitud?.toFixed(4)}`,
     descripcion: r.descripcion ?? "Sin descripción",
     hace: tiempoRelativo(r.created_at),
-    estado: estado.label,
-    estadoDot: estado.dot,
-    estadoBadge: estado.badge,
+    createdAt: r.created_at,
+    estado: r.estado ?? "pendiente",
     prioridad: SEVERIDAD_PRIORIDAD[r.severidad] ?? "Media",
     foto_url: r.foto_url ?? null,
   };
 }
 
-const ICONO_MAP = {
-  zap: <Zap size={14} />,
-  alert: <AlertTriangle size={14} />,
-  nav: <Navigation size={14} />,
-  timer: <Timer size={14} />,
-};
-
-// ── Modal de detalle ─────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────
 function ReporteModal({ reporte, onClose }) {
-  const [fotoAmpliada, setFotoAmpliada] = useState(false);
-
-  const prioridadColor =
-    reporte.prioridad === "Crítica"
-      ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
-      : reporte.prioridad === "Alta"
-        ? "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
-        : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
-
   return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+    <AnimatePresence>
+      <motion.div
+        key="backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/55 backdrop-blur-md"
+        onClick={onClose}
       >
-        {/* ── Header coloreado */}
-        <div className="relative px-6 pt-6 pb-5">
-          {/* fondo decorativo sutil */}
-          <div className={`absolute inset-0 opacity-[0.06] ${
-            reporte.prioridad === "Crítica" ? "bg-red-500" :
-            reporte.prioridad === "Alta"    ? "bg-orange-500" : "bg-blue-500"
-          }`} />
-
-          <div className="relative flex items-start gap-4">
-            {/* Icono */}
-            <div className={`${reporte.color} flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-100 dark:bg-gray-700 shrink-0 text-lg`}>
-              {ICONO_MAP[reporte.icono]}
-            </div>
-
-            {/* Títulos */}
-            <div className="flex-1 min-w-0 pt-0.5">
-              <h2 className="text-base font-bold text-slate-800 dark:text-white leading-tight">
-                {reporte.tipo}
-              </h2>
-              <p className="text-xs text-slate-400 dark:text-gray-400 mt-0.5">
-                Reporte <span className="font-mono">#{reporte.id}</span>
-              </p>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${prioridadColor}`}>
-                  {reporte.prioridad}
-                </span>
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${reporte.estadoBadge}`}>
-                  {reporte.estado}
-                </span>
-              </div>
-            </div>
-
-            {/* Cerrar */}
-            <button
-              onClick={onClose}
-              className="shrink-0 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-gray-700" />
-
-        {/* ── Foto (opcional) */}
-        {reporte.foto_url && (
-          <div className="relative overflow-hidden bg-slate-100 dark:bg-gray-700">
-            {fotoAmpliada ? (
+        <motion.div
+          key="card"
+          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="
+            relative w-full max-w-lg
+            bg-[var(--surface)] rounded-2xl overflow-hidden
+            shadow-[var(--shadow-pop)] border border-[var(--border)]
+          "
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Photo with overlay */}
+          {reporte.foto_url ? (
+            <div className="relative h-[180px] overflow-hidden">
               <img
                 src={reporte.foto_url}
                 alt="Foto del reporte"
-                className="w-full object-contain max-h-80 cursor-zoom-out"
-                onClick={() => setFotoAmpliada(false)}
+                className="w-full h-full object-cover"
               />
-            ) : (
-              <div className="relative cursor-zoom-in group" onClick={() => setFotoAmpliada(true)}>
-                <img
-                  src={reporte.foto_url}
-                  alt="Foto del reporte"
-                  className="w-full h-48 object-cover"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
-                    <ExternalLink size={13} /> Ver foto completa
-                  </span>
-                </div>
-                <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 text-white text-[10px] font-semibold px-2 py-1 rounded-full backdrop-blur-sm">
-                  <Camera size={10} /> Foto del reporte
-                </span>
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/45" />
+              <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2 h-6 rounded-full bg-black/55 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                <Camera size={11} strokeWidth={2.5} /> Foto del reporte
+              </span>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center bg-black/55 text-white hover:bg-black/75 backdrop-blur-sm transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                <X size={16} strokeWidth={2.3} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 px-5 pt-5">
+              <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)] font-mono">
+                <Camera size={12} /> Sin foto adjunta
+              </span>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-muted)] transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                <X size={16} strokeWidth={2.3} />
+              </button>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="px-5 pt-4 pb-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)] font-mono">
+              Reporte · #{String(reporte.id).slice(0, 8)}
+            </p>
+            <h2 className="font-display text-[20px] font-bold tracking-tight text-[var(--text-primary)] leading-tight mt-1">
+              {reporte.tipo}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span
+                className={`
+                  inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full
+                  text-[11px] font-bold border
+                  ${PRIORIDAD_STYLES[reporte.prioridad] ?? PRIORIDAD_STYLES.Media}
+                `}
+              >
+                <AlertTriangle size={11} strokeWidth={2.4} />
+                {reporte.prioridad}
+              </span>
+              <span
+                className="
+                  inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full
+                  text-[11px] font-bold border
+                  bg-[var(--ok-tint)] text-[var(--ok)] border-[var(--ok)]/30
+                "
+              >
+                <Radio size={11} strokeWidth={2.4} />
+                {reporte.estado.charAt(0).toUpperCase() + reporte.estado.slice(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="border-t border-[var(--border)]" />
+
+          {/* Info grid */}
+          <div className="grid grid-cols-2 gap-3 px-5 py-4">
+            <InfoCell icon={MapPin} label="Dirección" value={reporte.direccion} span="col-span-2" />
+            <InfoCell icon={Clock} label="Reportado" value={`hace ${reporte.hace}`} />
+            <InfoCell icon={Timer} label="Categoría" value={reporte.tipo} />
+            {reporte.descripcion !== "Sin descripción" && (
+              <InfoCell
+                icon={FileText}
+                label="Descripción"
+                value={reporte.descripcion}
+                span="col-span-2"
+              />
             )}
           </div>
-        )}
-
-        {/* ── Cuerpo */}
-        <div className="px-6 py-5 space-y-4">
-          {/* Dirección */}
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 shrink-0">
-              <MapPin size={15} className="text-blue-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-0.5">
-                Dirección
-              </p>
-              <p className="text-sm text-slate-700 dark:text-gray-200 leading-snug">
-                {reporte.direccion}
-              </p>
-            </div>
-          </div>
-
-          {/* Tiempo */}
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-gray-700 shrink-0">
-              <Clock size={15} className="text-slate-400" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-0.5">
-                Reportado
-              </p>
-              <p className="text-sm text-slate-700 dark:text-gray-200">
-                hace {reporte.hace}
-              </p>
-            </div>
-          </div>
-
-          {/* Descripción */}
-          {reporte.descripcion !== "Sin descripción" && (
-            <div className="rounded-xl bg-slate-50 dark:bg-gray-700/60 p-4 border border-slate-100 dark:border-gray-600">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 mb-1.5">
-                Descripción
-              </p>
-              <p className="text-sm text-slate-600 dark:text-gray-300 leading-relaxed">
-                {reporte.descripcion}
-              </p>
-            </div>
-          )}
-
-          {/* Sin foto */}
-          {!reporte.foto_url && (
-            <p className="flex items-center gap-1.5 text-xs text-slate-300 dark:text-gray-600">
-              <Camera size={12} /> Sin foto adjunta
-            </p>
-          )}
-        </div>
-      </div>
-    </div>,
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
     document.body,
   );
 }
 
-// ── Feed principal ────────────────────────────────────────────
-// Props:
-//   reportes — array crudo del API (sin adaptar)
-//   newIds   — Set<number> de IDs que llegaron en el último poll
+function InfoCell({ icon: Icon, label, value, span = "" }) {
+  return (
+    <div className={`flex items-start gap-2.5 ${span}`}>
+      <div className="w-7 h-7 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center shrink-0 mt-0.5">
+        <Icon size={13} strokeWidth={2.1} className="text-[var(--text-tertiary)]" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-tertiary)] font-mono mb-0.5">
+          {label}
+        </p>
+        <p className="text-[13px] text-[var(--text-primary)] leading-snug">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Feed ─────────────────────────────────────────────────────
 export default function ReporteFeed({ reportes = [], newIds = new Set() }) {
   const [seleccionado, setSeleccionado] = useState(null);
-
   const adaptados = reportes.map(adaptarReporte);
   const numNuevos = adaptados.filter((r) => newIds.has(r.id)).length;
 
   return (
     <>
-      {/* Header del aside */}
-      <div className="mb-4 pb-3 border-b border-slate-100 dark:border-gray-700">
+      {/* Header */}
+      <div className="mb-4 pb-3 border-b border-[var(--border)]">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-slate-800 dark:text-white text-sm">
-            Reportes Ciudadanos
-          </h2>
-          {/* Badge de nuevos reportes */}
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)] font-mono">
+            Live Feed
+          </p>
           {numNuevos > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold animate-bounce">
-              <Bell size={10} />
+            <motion.span
+              key={numNuevos}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--ok-tint)] text-[var(--ok)] text-[10px] font-bold"
+            >
+              <Bell size={10} strokeWidth={2.5} />
               {numNuevos} nuevo{numNuevos > 1 ? "s" : ""}
-            </span>
+            </motion.span>
           )}
         </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs text-slate-400 dark:text-gray-400 uppercase tracking-widest">
-            Reportes Actualizado
-          </span>
+        <h2 className="font-display text-[16px] font-bold tracking-tight text-[var(--text-primary)] leading-tight mt-1">
+          Reportes Ciudadanos
+        </h2>
+        <div className="flex items-center gap-2 mt-1.5">
+          <StatusDot tone="ok" label="Sincronizado en vivo" />
         </div>
       </div>
 
-      {/* Lista con scroll */}
-      <div className="space-y-1">
+      {/* List */}
+      <ul className="space-y-1.5">
         {adaptados.length === 0 && (
-          <p className="text-xs text-slate-400 dark:text-gray-500 text-center py-4">
+          <li className="text-xs text-[var(--text-tertiary)] text-center py-6">
             Sin reportes recientes
-          </p>
+          </li>
         )}
         {adaptados.map((r) => {
           const esNuevo = newIds.has(r.id);
+          const Icon = r.Icon;
           return (
-            <button
-              key={r.id}
-              onClick={() => setSeleccionado(r)}
-              className={[
-                "w-full text-left p-3 rounded-xl transition-colors cursor-pointer group",
-                esNuevo
-                  ? "animate-slide-in-top bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 ring-1 ring-emerald-300 dark:ring-emerald-700"
-                  : "hover:bg-slate-50 dark:hover:bg-gray-700",
-              ].join(" ")}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className={`${r.color} mt-0.5 shrink-0`}>
-                  {ICONO_MAP[r.icono]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-gray-200 truncate">
-                      {r.tipo}
-                    </p>
-                    {esNuevo && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-500 text-white leading-none">
-                        NEW
-                      </span>
-                    )}
+            <li key={r.id}>
+              <button
+                onClick={() => setSeleccionado(r)}
+                className={`
+                  group w-full text-left p-3 rounded-xl
+                  transition-all duration-200 cursor-pointer
+                  border
+                  ${
+                    esNuevo
+                      ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
+                      : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
+                  }
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`
+                      w-9 h-9 rounded-xl flex items-center justify-center shrink-0
+                      border ${r.tone.bg} ${r.tone.border}
+                    `}
+                  >
+                    <Icon size={15} strokeWidth={2.2} className={r.tone.text} />
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1">
-                      <MapPin size={10} /> {r.direccion}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[13px] font-bold text-[var(--text-primary)] truncate font-display tracking-tight">
+                        {r.tipo}
+                      </p>
+                      {esNuevo && (
+                        <span className="text-[9px] font-bold px-1.5 h-4 rounded bg-[var(--ok)] text-white leading-none inline-flex items-center font-mono uppercase tracking-wider">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5 truncate">
+                      <MapPin size={10} strokeWidth={2.2} className="shrink-0 text-[var(--text-tertiary)]" />
+                      <span className="truncate">{r.direccion}</span>
                     </p>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${r.estadoBadge}`}
-                    >
-                      {r.estado}
+                    <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
+                      {r.descripcion}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular">
+                      {r.hace}
                     </span>
+                    <StatusDot
+                      tone={ESTADO_TONE[r.estado] ?? "muted"}
+                      pulse={r.estado === "pendiente"}
+                      size="sm"
+                    />
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-gray-400 mt-1 line-clamp-1">
-                    {r.descripcion}
-                  </p>
                 </div>
-                <span className="text-[10px] text-slate-300 dark:text-gray-600 shrink-0 whitespace-nowrap">
-                  {r.hace}
-                </span>
-              </div>
-            </button>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
-      {/* Modal — solo se renderiza si hay un reporte seleccionado */}
       {seleccionado && (
         <ReporteModal
           reporte={seleccionado}

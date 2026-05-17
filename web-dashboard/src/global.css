@@ -1,10 +1,164 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
-/* Habilita dark mode por clase en Tailwind v4 */
+/* ─────────────────────────────────────────────────────────────
+   Dark mode driven by .dark on a parent (DashboardLayout root)
+   ───────────────────────────────────────────────────────────── */
 @variant dark (&:where(.dark, .dark *));
 
-/* Animación de entrada para nuevos reportes en el feed */
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — light theme (default) + dark overrides
+   Editorial smart-city palette, not generic SaaS white-and-gray.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --bg-primary: #f8fafc;
+  --bg-elevated: #f1f5f9;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --accent-soft-hover: #bfdbfe;
+  --accent-tint: #eff6ff;
+
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+  --warn-tint: #fffbeb;
+
+  --crit: #dc2626;
+  --crit-soft: #fee2e2;
+  --crit-tint: #fef2f2;
+
+  --ok: #059669;
+  --ok-soft: #d1fae5;
+  --ok-tint: #ecfdf5;
+
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04),
+    0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.06),
+    0 4px 12px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 8px 24px -6px rgb(15 23 42 / 0.10),
+    0 4px 8px -4px rgb(15 23 42 / 0.06);
+  --shadow-accent: 0 8px 24px -8px rgb(37 99 235 / 0.40);
+}
+
+.dark {
+  --bg-primary: #0a0e1a;
+  --bg-elevated: #0f172a;
+  --surface: #111827;
+  --surface-muted: #0f172a;
+  --border: #1f2937;
+  --border-strong: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgb(30 64 175 / 0.35);
+  --accent-soft-hover: rgb(30 64 175 / 0.50);
+  --accent-tint: rgb(37 99 235 / 0.12);
+
+  --warn: #f59e0b;
+  --warn-soft: rgb(180 83 9 / 0.25);
+  --warn-tint: rgb(217 119 6 / 0.10);
+
+  --crit: #ef4444;
+  --crit-soft: rgb(153 27 27 / 0.30);
+  --crit-tint: rgb(220 38 38 / 0.10);
+
+  --ok: #10b981;
+  --ok-soft: rgb(6 78 59 / 0.35);
+  --ok-tint: rgb(5 150 105 / 0.10);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.55);
+  --shadow-accent: 0 8px 32px -8px rgb(59 130 246 / 0.55);
+}
+
+/* Make CSS variables accessible as Tailwind utilities */
+@theme inline {
+  --color-bg: var(--bg-primary);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-base: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-tint: var(--warn-tint);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-crit-tint: var(--crit-tint);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-tint: var(--ok-tint);
+
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --shadow-soft: var(--shadow-sm);
+  --shadow-card: var(--shadow-md);
+  --shadow-pop: var(--shadow-lg);
+  --shadow-glow: var(--shadow-accent);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Global resets
+   ───────────────────────────────────────────────────────────── */
+html,
+body,
+#root {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Numbers, IDs, coordinates */
+.font-mono,
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom thin scrollbar for sidebars and tables */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Animations
+   ───────────────────────────────────────────────────────────── */
 @keyframes slide-in-top {
   from {
     opacity: 0;
@@ -15,7 +169,61 @@
     transform: translateY(0);
   }
 }
-
 .animate-slide-in-top {
-  animation: slide-in-top 0.35s ease-out forwards;
+  animation: slide-in-top 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Focus ring tokens */
+.ring-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+/* Subtle inner top highlight on cards (depth without heavy shadow) */
+.card-highlight {
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.5) 0%,
+    transparent 1px
+  );
+}
+.dark .card-highlight {
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.04) 0%,
+    transparent 1px
+  );
 }

@@ -174,12 +174,6 @@ export default function MapaGoogleMaps({
   reportes = [], // array crudo del API — reportes ciudadanos
   newIds = new Set(), // IDs que llegaron en el último poll
 }) {
-  const mapContainerStyle = {
-    height: alturaContenedor,
-    width: "100%",
-    borderRadius: "12px",
-  };
-
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY ?? "",
     libraries: LIBRARIES,
@@ -343,107 +337,131 @@ export default function MapaGoogleMaps({
   }, []);
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  //
+  // IMPORTANTE: El componente NO tiene un div wrapper con padding/altura fija.
+  // Ocupa el 100% de su contenedor (que en MapaView.jsx es un absolute-inset).
+  // Los controles flotan sobre el mapa mediante position:absolute para que
+  // el canvas de Google Maps siempre reciba una altura real en píxeles.
+
+  // Error fatal: Google Maps no pudo cargarse en absoluto.
+  if (loadError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center rounded-2xl bg-slate-100 dark:bg-gray-800">
+        <p className="text-xs text-red-500 text-center px-6">
+          No se pudo cargar Google Maps. Verifica que{" "}
+          <code>VITE_GOOGLE_MAPS_KEY</code> sea válida y tenga habilitadas
+          «Maps JavaScript API» y «Maps JavaScript API Visualization».
+          <br />
+          <span className="text-slate-400">{loadError.message}</span>
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
-      {/* Encabezado — igual que MapaLeaflet */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-widest">
-            {mostrarHeatmap ? "Mapa de Calor" : "Reportes"} — Barranquilla
-          </p>
-          {reportes.length > 0 && (
-            <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">
-              {reportes.length} reporte{reportes.length !== 1 ? "s" : ""} activo
-              {reportes.length !== 1 ? "s" : ""} en el mapa
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Toggle mapa de calor */}
-          <button
-            onClick={() => setMostrarHeatmap((v) => !v)}
-            title={
-              mostrarHeatmap ? "Ocultar mapa de calor" : "Mostrar mapa de calor"
-            }
-            className={[
-              "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer",
-              mostrarHeatmap
-                ? "bg-red-50 border-red-200 text-red-600 dark:bg-red-900/30 dark:border-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
-                : "bg-slate-100 border-slate-200 text-slate-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-gray-600",
-            ].join(" ")}
-          >
-            <Layers size={12} />
-            {mostrarHeatmap ? "Calor activo" : "Calor oculto"}
-          </button>
+    // fill-parent: DashboardLayout ya garantiza un contenedor con altura real.
+    <div className="relative w-full h-full">
 
-          {/* Leyenda (solo visible cuando el heatmap está activo) */}
-          {mostrarHeatmap && (
-            <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-                Bajo
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
-                Medio
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                Alto
-              </span>
-            </div>
-          )}
-
-          {cargando && (
-            <span className="text-[10px] text-slate-300 dark:text-gray-600 italic">
-              cargando...
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Error de carga de API key */}
-      {loadError && (
-        <div className="flex items-center justify-center h-[320px] rounded-xl bg-slate-100 dark:bg-gray-700">
-          <p className="text-xs text-red-500 text-center px-4">
-            No se pudo cargar Google Maps. Verifica que VITE_GOOGLE_MAPS_KEY sea
-            válida y tenga habilitadas «Maps JavaScript API» y «Maps JavaScript
-            API Visualization».
-            <br />
-            <span className="text-slate-400">{loadError.message}</span>
-          </p>
-        </div>
-      )}
-
-      {/* Error de fetch */}
-      {!loadError && errorFetch && (
-        <div className="flex items-center justify-center h-[320px] rounded-xl bg-slate-100 dark:bg-gray-700">
-          <p className="text-xs text-red-500 text-center px-4">
-            Error al cargar hotspots: {errorFetch}
-          </p>
-        </div>
-      )}
-
-      {/* Skeleton mientras carga el script de Google Maps */}
-      {!isLoaded && !loadError && (
-        <div
-          style={mapContainerStyle}
-          className="bg-slate-200 dark:bg-gray-700 animate-pulse flex items-center justify-center"
-        >
+      {/* ── Skeleton mientras carga el script de Google Maps ── */}
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-slate-200 dark:bg-gray-700 animate-pulse flex items-center justify-center rounded-2xl">
           <span className="text-xs text-slate-400">Cargando mapa...</span>
         </div>
       )}
 
-      {/* Mapa */}
-      {isLoaded && !loadError && !errorFetch && (
+      {/* ── GoogleMap: llena todo el contenedor ── */}
+      {isLoaded && (
         <GoogleMap
-          mapContainerStyle={mapContainerStyle}
+          mapContainerStyle={{ width: "100%", height: "100%" }}
           center={BARRANQUILLA_CENTER}
           zoom={DEFAULT_ZOOM}
           options={MAP_OPTIONS}
           onLoad={onMapLoad}
         />
+      )}
+
+      {/* ── Controles flotantes (overlay) ── */}
+      {isLoaded && (
+        <div className="absolute top-3 left-3 right-3 flex items-start justify-between pointer-events-none gap-2 flex-wrap">
+          {/* Etiqueta izquierda */}
+          <div
+            className="pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm
+                        rounded-xl px-3 py-1.5 shadow border border-white/40 dark:border-gray-700/60"
+          >
+            <p className="text-[11px] font-semibold text-slate-600 dark:text-gray-300 uppercase tracking-widest leading-none">
+              {mostrarHeatmap ? "Mapa de Calor" : "Reportes"} · Barranquilla
+            </p>
+            {reportes.length > 0 && (
+              <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 leading-none">
+                {reportes.length} reporte{reportes.length !== 1 ? "s" : ""} activo
+                {reportes.length !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+
+          {/* Controles derecha */}
+          <div className="pointer-events-auto flex items-center gap-2 flex-wrap justify-end">
+            {/* Toggle mapa de calor */}
+            <button
+              onClick={() => setMostrarHeatmap((v) => !v)}
+              title={mostrarHeatmap ? "Ocultar mapa de calor" : "Mostrar mapa de calor"}
+              className={[
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold",
+                "border backdrop-blur-sm shadow transition-colors cursor-pointer",
+                mostrarHeatmap
+                  ? "bg-red-50/90 border-red-200 text-red-600 dark:bg-red-900/60 dark:border-red-700 dark:text-red-400 hover:bg-red-100"
+                  : "bg-white/90 border-slate-200 text-slate-500 dark:bg-gray-800/80 dark:border-gray-600 dark:text-gray-400 hover:bg-slate-50",
+              ].join(" ")}
+            >
+              <Layers size={12} />
+              {mostrarHeatmap ? "Calor activo" : "Calor oculto"}
+            </button>
+
+            {/* Leyenda */}
+            {mostrarHeatmap && (
+              <div
+                className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-gray-400
+                            bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm
+                            rounded-xl px-2.5 py-1.5 border border-white/40 dark:border-gray-700/60 shadow"
+              >
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+                  Bajo
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
+                  Medio
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                  Alto
+                </span>
+              </div>
+            )}
+
+            {cargando && (
+              <span
+                className="text-[10px] italic text-slate-400 bg-white/80 dark:bg-gray-900/80
+                            backdrop-blur-sm rounded-lg px-2 py-1 border border-white/30 dark:border-gray-700/50"
+              >
+                cargando hotspots…
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Error de hotspots (no-fatal): banner en la parte inferior ── */}
+      {isLoaded && errorFetch && (
+        <div className="absolute bottom-3 left-3 right-3 flex justify-center pointer-events-none">
+          <p
+            className="text-[11px] text-red-600 dark:text-red-400 bg-red-50/90 dark:bg-red-900/60
+                        backdrop-blur-sm border border-red-200 dark:border-red-700
+                        rounded-xl px-3 py-1.5 shadow"
+          >
+            ⚠ No se pudieron cargar hotspots: {errorFetch}
+          </p>
+        </div>
       )}
     </div>
   );
