@@ -515,6 +515,7 @@ export default function MapScreen() {
         icono: "fire",
         label: "Mapa calor",
         activo: heatmapMode,
+        color: colors.accent,
         onPress: () => setHeatmapMode((v) => !v),
       },
       {
@@ -522,6 +523,7 @@ export default function MapScreen() {
         icono: modoSeguroActivo ? "shield-check" : "shield-outline",
         label: "Modo seguro",
         activo: modoSeguroActivo,
+        color: colors.success,
         onPress: toggleModoSeguro,
       },
       {

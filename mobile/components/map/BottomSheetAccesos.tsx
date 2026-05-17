@@ -15,6 +15,8 @@ export interface QuickTile {
   icono: IconName;
   label: string;
   activo?: boolean;
+  /** Color used for the active state background. Defaults to colors.primary. */
+  color?: string;
   onPress: () => void;
 }
 
@@ -113,11 +115,14 @@ function BottomSheetAccesosBase(
               }}
               key={tile.id}
               onPress={tile.onPress}
-              style={({ pressed }) => [
-                styles.tile,
-                tile.activo && styles.tileActiva,
-                pressed && styles.tilePressed,
-              ]}
+              style={({ pressed }) => {
+                const activeColor = tile.color ?? colors.primary;
+                return [
+                  styles.tile,
+                  tile.activo && { backgroundColor: activeColor, borderColor: activeColor },
+                  pressed && styles.tilePressed,
+                ];
+              }}
             >
               <MaterialCommunityIcons
                 color={tile.activo ? "#fff" : colors.primaryDark}
@@ -302,10 +307,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-  },
-  tileActiva: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   tilePressed: {
     opacity: 0.7,

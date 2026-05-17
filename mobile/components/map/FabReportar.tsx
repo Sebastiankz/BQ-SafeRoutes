@@ -1,5 +1,6 @@
+import { useEffect, useRef } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 
 import { colors, shadow } from "../../theme/tokens";
 
@@ -13,9 +14,43 @@ export default function FabReportar({
   habilitado = true,
 }: FabReportarProps) {
   const accentColor = habilitado ? colors.danger : colors.accent;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.65],
+  });
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.55, 0.3, 0],
+  });
 
   return (
     <View style={styles.haloWrap} pointerEvents="box-none">
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.pulse,
+          {
+            backgroundColor: accentColor,
+            transform: [{ scale: pulseScale }],
+            opacity: pulseOpacity,
+          },
+        ]}
+      />
       <View
         pointerEvents="none"
         style={[
@@ -66,6 +101,12 @@ const styles = StyleSheet.create({
     height: FAB_SIZE + HALO_PADDING * 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  pulse: {
+    position: "absolute",
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
   },
   halo: {
     position: "absolute",
