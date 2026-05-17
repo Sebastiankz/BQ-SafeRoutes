@@ -5,6 +5,8 @@ import type { MapViewProps, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
 
+const USER_MARKER_ANCHOR = { x: 0.5, y: 0.5 } as const;
+
 import type { Reporte } from "../../services/reportes";
 import type { LatLng } from "../../services/maps";
 import { colors } from "../../theme/tokens";
@@ -54,6 +56,8 @@ function MapaInteractivoBase(
   }: MapaInteractivoProps,
   ref: Ref<MapView>,
 ) {
+  const userMarkerKey = `user-location-marker-${heatmapMode ? "heat" : "normal"}`;
+
   return (
     <MapView
       ref={ref}
@@ -114,6 +118,7 @@ function MapaInteractivoBase(
 
       {destinoCoords && (
         <Marker
+          key="destination-marker"
           coordinate={destinoCoords}
           tracksViewChanges={false}
           zIndex={20}
@@ -126,14 +131,14 @@ function MapaInteractivoBase(
           </View>
         </Marker>
       )}
-
       {userCoords && (
         <Marker
+          key={userMarkerKey}
           coordinate={userCoords}
-          anchor={{ x: 0.5, y: 0.5 }}
+          anchor={USER_MARKER_ANCHOR}
           flat
           rotation={userHeading}
-          tracksViewChanges={false}
+          tracksViewChanges
           zIndex={30}
         >
           <View style={styles.usuarioContenedor}>
