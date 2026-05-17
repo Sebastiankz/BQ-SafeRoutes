@@ -65,11 +65,17 @@ export async function obtenerCoordenadasLugar(
     return { latitude: loc.lat, longitude: loc.lng };
 }
 
+export type RutaResult = {
+    puntos: LatLng[];
+    duracion: string;
+    distancia: string;
+};
+
 export async function obtenerRuta(
     origen: LatLng,
     destino: LatLng,
     apiKey: string,
-): Promise<LatLng[]> {
+): Promise<RutaResult> {
     const url =
         `${BASE}/directions/json` +
         `?origin=${origen.latitude},${origen.longitude}` +
@@ -81,9 +87,12 @@ export async function obtenerRuta(
     if (json.status !== "OK") {
         throw new Error(`Directions: ${json.status}`);
     }
-    const encodedPolyline: string =
-        json.routes[0].overview_polyline.points;
-    return decodificarPolyline(encodedPolyline);
+    const leg = json.routes[0].legs[0];
+    return {
+        puntos: decodificarPolyline(json.routes[0].overview_polyline.points as string),
+        duracion: leg.duration.text as string,
+        distancia: leg.distance.text as string,
+    };
 }
 
 function decodificarPolyline(encoded: string): LatLng[] {

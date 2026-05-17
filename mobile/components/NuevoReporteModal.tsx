@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ComponentProps } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,12 +27,14 @@ import { crearReporte } from "../services/reportes";
 import { subirFotoReporte } from "../services/storage";
 import { colors, iosTitleFont, radii, shadow } from "../theme/tokens";
 
-const TIPOS: { value: TipoReporte; label: string }[] = [
-  { value: "accidente", label: "Accidente" },
-  { value: "hueco", label: "Hueco" },
-  { value: "arroyo", label: "Arroyo" },
-  { value: "semaforo_danado", label: "Semáforo" },
-  { value: "otro", label: "Otro" },
+type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+const TIPOS: { value: TipoReporte; label: string; icono: IconName; color: string }[] = [
+  { value: "accidente", label: "Accidente",  icono: "car-emergency",  color: "#DC2626" },
+  { value: "hueco",     label: "Hueco",      icono: "road-variant",   color: "#D97706" },
+  { value: "arroyo",    label: "Arroyo",     icono: "waves",          color: "#2563EB" },
+  { value: "semaforo_danado", label: "Semáforo", icono: "traffic-light", color: "#7C3AED" },
+  { value: "otro",      label: "Otro",       icono: "alert-circle",   color: "#6B7280" },
 ];
 
 interface Props {
@@ -188,26 +191,54 @@ export default function NuevoReporteModal({
               nestedScrollEnabled
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.etiqueta}>Tipo</Text>
+              <Text style={styles.etiqueta}>¿Qué ves?</Text>
               <View style={styles.gridTipos}>
-                {TIPOS.map((t) => (
-                  <Pressable
-                    key={t.value}
-                    accessibilityRole="button"
-                    disabled={guardando}
-                    style={[styles.chip, tipo === t.value && styles.chipActivo]}
-                    onPress={() => setTipo(t.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipTxt,
-                        tipo === t.value && styles.chipTxtActivo,
+                {TIPOS.map((t) => {
+                  const activo = tipo === t.value;
+                  return (
+                    <Pressable
+                      key={t.value}
+                      accessibilityLabel={t.label}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: activo }}
+                      disabled={guardando}
+                      onPress={() => setTipo(t.value)}
+                      style={({ pressed }) => [
+                        styles.tipoItem,
+                        pressed && { opacity: 0.72 },
                       ]}
                     >
-                      {t.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <View
+                        style={[
+                          styles.tipoCirculo,
+                          { backgroundColor: activo ? t.color : `${t.color}1F` },
+                          activo && {
+                            shadowColor: t.color,
+                            shadowOpacity: 0.45,
+                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 4 },
+                            elevation: 8,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={t.icono}
+                          size={32}
+                          color={activo ? "#fff" : t.color}
+                        />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.tipoLabel,
+                          activo && { color: t.color, fontWeight: "800" },
+                        ]}
+                      >
+                        {t.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
               <Text style={styles.etiqueta}>Severidad (1–5)</Text>
@@ -374,18 +405,28 @@ const styles = StyleSheet.create({
   gridTipos: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceMuted,
+  tipoItem: {
+    width: "33.33%",
+    alignItems: "center",
+    paddingVertical: 10,
   },
-  chipActivo: { backgroundColor: colors.primary },
-  chipTxt: { fontSize: 13, color: colors.text },
-  chipTxtActivo: { color: "#fff", fontWeight: "600" },
+  tipoCirculo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  tipoLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text,
+    textAlign: "center",
+    letterSpacing: 0.1,
+  },
   filaSev: { flexDirection: "row", gap: 10, marginBottom: 14 },
   sevBtn: {
     width: 42,

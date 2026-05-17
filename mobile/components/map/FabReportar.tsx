@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { colors, shadow } from "../../theme/tokens";
 
@@ -44,7 +44,6 @@ export default function FabReportar({
         ]}
       >
         <MaterialCommunityIcons color="#fff" name="plus-thick" size={30} />
-        <Text style={styles.label}>Reportar</Text>
       </Pressable>
     </View>
   );
@@ -90,12 +89,5 @@ const styles = StyleSheet.create({
   fabPressed: {
     transform: [{ scale: 0.94 }],
     opacity: 0.94,
-  },
-  label: {
-    color: "#fff",
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginTop: 1,
-    letterSpacing: 0.4,
   },
 });

@@ -56,7 +56,13 @@ function MapaInteractivoBase(
   }: MapaInteractivoProps,
   ref: Ref<MapView>,
 ) {
-  const userMarkerKey = `user-location-marker-${heatmapMode ? "heat" : "normal"}`;
+  // Workaround de react-native-maps: al alternar el overlay <Heatmap>, los
+  // markers pierden su bitmap permanentemente (afecta tanto al de usuario
+  // como a uno o más markers de reportes). Suffijar las keys con el modo
+  // del heatmap fuerza un remount limpio en cada toggle, garantizando que
+  // todos los markers capturen un bitmap fresco al re-montarse.
+  const heatmapKeySuffix = heatmapMode ? "heat" : "normal";
+  const userMarkerKey = `user-location-marker-${heatmapKeySuffix}`;
 
   return (
     <MapView
@@ -74,27 +80,26 @@ function MapaInteractivoBase(
       followsUserLocation={false}
       mapPadding={mapPadding}
     >
-      {!heatmapMode &&
-        reportes.map((r) => {
-          const color = colorPorTipo[r.tipo] ?? "#6B7280";
-          const icono = (iconoPorTipo[r.tipo] ?? "alert-circle") as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-          return (
-            <Marker
-              key={r.id}
-              coordinate={{ latitude: r.latitud, longitude: r.longitud }}
-              title={r.tipo.replace(/_/g, " ")}
-              description={r.descripcion ?? undefined}
-              tracksViewChanges={false}
-            >
-              <View style={[styles.marcadorContenedor, { borderColor: color }]}>
-                <View style={[styles.marcadorBurbuja, { backgroundColor: color }]}>
-                  <MaterialCommunityIcons name={icono} size={18} color="#fff" />
-                </View>
-                <View style={[styles.marcadorPunta, { borderTopColor: color }]} />
+      {reportes.map((r) => {
+        const color = colorPorTipo[r.tipo] ?? "#6B7280";
+        const icono = (iconoPorTipo[r.tipo] ?? "alert-circle") as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+        return (
+          <Marker
+            key={`${r.id}-${heatmapKeySuffix}`}
+            coordinate={{ latitude: r.latitud, longitude: r.longitud }}
+            title={r.tipo.replace(/_/g, " ")}
+            description={r.descripcion ?? undefined}
+            tracksViewChanges={false}
+          >
+            <View style={[styles.marcadorContenedor, { borderColor: color }]}>
+              <View style={[styles.marcadorBurbuja, { backgroundColor: color }]}>
+                <MaterialCommunityIcons name={icono} size={18} color="#fff" />
               </View>
-            </Marker>
-          );
-        })}
+              <View style={[styles.marcadorPunta, { borderTopColor: color }]} />
+            </View>
+          </Marker>
+        );
+      })}
 
       {heatmapMode && heatmapPoints.length > 0 && (
         <Heatmap
@@ -106,19 +111,22 @@ function MapaInteractivoBase(
       )}
 
       {rutaPolyline && rutaPolyline.length > 1 && (
-        <Polyline
-          coordinates={rutaPolyline}
-          strokeColor={colors.primary}
-          strokeWidth={5}
-          zIndex={10}
-          lineCap="round"
-          lineJoin="round"
-        />
+        <>
+          {/* Línea principal */}
+          <Polyline
+            coordinates={rutaPolyline}
+            strokeColor={colors.primary}
+            strokeWidth={5}
+            zIndex={10}
+            lineCap="round"
+            lineJoin="round"
+          />
+        </>
       )}
 
       {destinoCoords && (
         <Marker
-          key="destination-marker"
+          key={`destination-marker-${heatmapKeySuffix}`}
           coordinate={destinoCoords}
           tracksViewChanges={false}
           zIndex={20}

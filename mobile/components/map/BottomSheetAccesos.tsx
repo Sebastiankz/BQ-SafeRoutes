@@ -124,15 +124,6 @@ function BottomSheetAccesosBase(
                 name={tile.icono}
                 size={22}
               />
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.tileLabel,
-                  tile.activo && styles.tileLabelActiva,
-                ]}
-              >
-                {tile.label}
-              </Text>
             </Pressable>
           ))}
         </View>
@@ -302,10 +293,9 @@ const styles = StyleSheet.create({
   },
   tile: {
     flex: 1,
-    minHeight: 72,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
     paddingVertical: 12,
     paddingHorizontal: 6,
     borderRadius: radii.md,
@@ -319,15 +309,6 @@ const styles = StyleSheet.create({
   },
   tilePressed: {
     opacity: 0.7,
-  },
-  tileLabel: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  tileLabelActiva: {
-    color: "#fff",
   },
   sectionHeader: {
     flexDirection: "row",

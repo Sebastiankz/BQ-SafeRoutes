@@ -209,6 +209,7 @@ export default function MapScreen() {
   const [modalBusquedaVisible, setModalBusquedaVisible] = useState(false);
   const [destinoCoords, setDestinoCoords] = useState<MapLatLng | null>(null);
   const [rutaPolyline, setRutaPolyline] = useState<MapLatLng[]>([]);
+  const [rutaInfo, setRutaInfo] = useState<{ duracion: string; distancia: string } | null>(null);
   const [buscandoRuta, setBuscandoRuta] = useState(false);
   const animToast = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -804,6 +805,12 @@ export default function MapScreen() {
     setHeatmapMode(true);
   }
 
+  const cancelarRuta = useCallback(() => {
+    setDestinoCoords(null);
+    setRutaPolyline([]);
+    setRutaInfo(null);
+  }, []);
+
   const handleSeleccionarDestino = useCallback(
     async (lugar: LugarSugerido) => {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? "";
@@ -814,9 +821,10 @@ export default function MapScreen() {
       setBuscandoRuta(true);
       try {
         const destino = await obtenerCoordenadasLugar(lugar.placeId, apiKey);
-        const puntos = await obtenerRuta(origen, destino, apiKey);
+        const { puntos, duracion, distancia } = await obtenerRuta(origen, destino, apiKey);
         setDestinoCoords(destino);
         setRutaPolyline(puntos);
+        setRutaInfo({ duracion, distancia });
         mapRef.current?.fitToCoordinates([origen, ...puntos, destino], {
           edgePadding: { top: 80, right: 40, bottom: 240, left: 40 },
           animated: true,
@@ -1053,16 +1061,26 @@ export default function MapScreen() {
       />
 
       {destinoCoords && (
-        <Pressable
-          onPress={() => {
-            setDestinoCoords(null);
-            setRutaPolyline([]);
-          }}
-          style={[styles.cancelarRutaChip, { bottom: reportCtaBottom + FAB_VISUAL_EXTENT + FAB_TO_CONTROLES_GAP + 10 }]}
+        <View
+          pointerEvents="box-none"
+          style={[styles.rutaChipWrap, { bottom: reportCtaBottom + FAB_VISUAL_EXTENT + FAB_TO_CONTROLES_GAP + 10 }]}
         >
-          <MaterialCommunityIcons color="#fff" name="close" size={14} />
-          <Text style={styles.cancelarRutaTxt}>Cancelar ruta</Text>
-        </Pressable>
+          {rutaInfo && (
+            <View style={styles.rutaInfoPill}>
+              <MaterialCommunityIcons color={colors.primaryDark} name="clock-fast" size={14} />
+              <Text style={styles.rutaInfoTxt}>{rutaInfo.duracion}</Text>
+              <Text style={styles.rutaInfoSep}>·</Text>
+              <Text style={styles.rutaDistTxt}>{rutaInfo.distancia}</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={cancelarRuta}
+            style={({ pressed }) => [styles.cancelarRutaBtn, pressed && { opacity: 0.75 }]}
+          >
+            <MaterialCommunityIcons color="#fff" name="close" size={14} />
+            <Text style={styles.cancelarRutaTxt}>Cancelar</Text>
+          </Pressable>
+        </View>
       )}
 
       <BuscarDireccionModal
@@ -1299,19 +1317,49 @@ const styles = StyleSheet.create({
   filaMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   filaDesc: { fontSize: 14, color: colors.text, marginTop: 6 },
 
-  cancelarRutaChip: {
+  rutaChipWrap: {
     position: "absolute",
     alignSelf: "center",
-    left: "50%",
-    transform: [{ translateX: -70 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    zIndex: 10,
+  },
+  rutaInfoPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(14,165,164,0.30)",
+    ...shadow.overlay,
+  },
+  rutaInfoTxt: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  rutaInfoSep: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginHorizontal: 1,
+  },
+  rutaDistTxt: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  cancelarRutaBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     backgroundColor: colors.primaryDark,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: radii.pill,
-    zIndex: 10,
     ...shadow.floating,
   },
   cancelarRutaTxt: {
