@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,9 +28,17 @@ router = APIRouter(prefix="/reportes", tags=["reportes"])
 
 
 def _build_reporte_select():
+    email_sq = (
+        select(text("email"))
+        .select_from(text("auth.users"))
+        .where(text("auth.users.id = reportes.usuario_id"))
+        .limit(1)
+        .scalar_subquery()
+    )
     return select(
         Reporte.id,
         Reporte.usuario_id,
+        email_sq.label("usuario_email"),
         Reporte.tipo,
         Reporte.descripcion,
         Reporte.foto_url,

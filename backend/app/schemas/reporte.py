@@ -20,6 +20,7 @@ class ReporteCreate(BaseModel):
 class ReporteOut(BaseModel):
     id: int
     usuario_id: UUID
+    usuario_email: Optional[str] = None
     tipo: str
     descripcion: Optional[str] = None
     foto_url: Optional[str] = None
