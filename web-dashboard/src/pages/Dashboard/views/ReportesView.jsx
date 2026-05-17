@@ -120,11 +120,16 @@ export default function ReportesView() {
         () => cargarReportes(false),
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [cargarReportes]);
 
   const padresConfirmados = useMemo(
-    () => new Set(reportes.filter((r) => r.estado === "confirmado").map((r) => r.id)),
+    () =>
+      new Set(
+        reportes.filter((r) => r.estado === "confirmado").map((r) => r.id),
+      ),
     [reportes],
   );
 
@@ -202,9 +207,11 @@ export default function ReportesView() {
                 {e !== "todos" && <span>{ESTADO_ICON[e]}</span>}
                 {e.charAt(0).toUpperCase() + e.slice(1)}
                 <span className="ml-0.5 opacity-60">
-                  ({e === "todos"
+                  (
+                  {e === "todos"
                     ? reportes.length
-                    : reportes.filter((r) => estadoDisplayDe(r) === e).length})
+                    : reportes.filter((r) => estadoDisplayDe(r) === e).length}
+                  )
                 </span>
               </button>
             ))}
@@ -235,43 +242,58 @@ export default function ReportesView() {
               <Table.Header>
                 <Table.Column allowsSorting isRowHeader id="id">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>ID</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      ID
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 <Table.Column allowsSorting id="usuario_email">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>Email</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      Email
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 <Table.Column allowsSorting id="created_at">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>Fecha / Hora</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      Fecha / Hora
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 <Table.Column id="direccion">Direccion</Table.Column>
                 <Table.Column allowsSorting id="tipo">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>Tipo</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      Tipo
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 <Table.Column allowsSorting id="severidad">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>Severidad</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      Severidad
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 <Table.Column allowsSorting id="estado">
                   {({ sortDirection }) => (
-                    <SortableColumnHeader sortDirection={sortDirection}>Estado</SortableColumnHeader>
+                    <SortableColumnHeader sortDirection={sortDirection}>
+                      Estado
+                    </SortableColumnHeader>
                   )}
                 </Table.Column>
                 {isAdmin && (
-                  <Table.Column id="acciones" className="text-end">Acciones</Table.Column>
+                  <Table.Column id="acciones" className="text-end">
+                    Acciones
+                  </Table.Column>
                 )}
               </Table.Header>
 
               <Table.Body items={sortedFiltered}>
                 {(r) => {
-                  const sevLabel = SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
+                  const sevLabel =
+                    SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
                   const tipoLabel = TIPO_LABEL[r.tipo] ?? r.tipo;
                   const estadoDisplay = estadoDisplayDe(r);
                   return (
@@ -302,9 +324,9 @@ export default function ReportesView() {
                         {formatFecha(r.created_at)}
                       </Table.Cell>
 
-                      {/* DirecciÃ³n */}
+                      {/* Dirección */}
                       <Table.Cell className="text-xs max-w-xs truncate">
-                        {r.direccion ?? "Sin direcciÃ³n"}
+                        {r.direccion ?? "Sin dirección"}
                       </Table.Cell>
 
                       {/* Tipo */}
@@ -349,7 +371,9 @@ export default function ReportesView() {
                                 size="sm"
                                 variant="ghost"
                                 isDisabled={!!accionLoading[r.id]}
-                                onPress={() => handleCambioEstado(r, "confirmado")}
+                                onPress={() =>
+                                  handleCambioEstado(r, "confirmado")
+                                }
                                 className="flex items-center gap-1"
                               >
                                 {accionLoading[r.id] ? (
@@ -365,7 +389,9 @@ export default function ReportesView() {
                                 size="sm"
                                 variant="danger-soft"
                                 isDisabled={!!accionLoading[r.id]}
-                                onPress={() => handleCambioEstado(r, "inactivo")}
+                                onPress={() =>
+                                  handleCambioEstado(r, "inactivo")
+                                }
                                 className="flex items-center gap-1"
                               >
                                 {accionLoading[r.id] ? (
