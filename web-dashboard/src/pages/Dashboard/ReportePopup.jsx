@@ -4,6 +4,7 @@
 // Se posiciona como position:absolute dentro del contenedor del mapa.
 // El anchor (left/top) corresponde al punto de anclaje del marcador (centro inferior).
 
+import { useState, useEffect } from "react";
 import {
   MapPin,
   Clock,
@@ -14,6 +15,7 @@ import {
   Zap,
   CircleAlert,
 } from "lucide-react";
+import { reverseGeocode } from "../../lib/geocode";
 
 // ── Constantes (deben coincidir con las de MapaGoogleMaps.jsx) ────────────────
 
@@ -113,15 +115,28 @@ const ANCHOR_OFFSET_Y = 56;
  * @param {function} onClose   — callback al cerrar (opcional, el mapa lo cierra también)
  */
 export default function ReportePopup({ reporte, pixelPos, onClose }) {
-  if (!reporte || !pixelPos) return null;
+  const [dir, setDir] = useState(() => reporte?.direccion?.trim() || null);
 
+  useEffect(() => {
+    if (!reporte) return;
+    if (reporte.direccion?.trim()) {
+      setDir(reporte.direccion.trim());
+      return;
+    }
+    if (reporte.latitud == null || reporte.longitud == null) {
+      setDir("Sin dirección");
+      return;
+    }
+    reverseGeocode(reporte.latitud, reporte.longitud).then((addr) => {
+      setDir(addr ?? "Sin dirección");
+    });
+  }, [reporte?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!reporte || !pixelPos) return null;
   const label = TIPO_LABEL[reporte.tipo] ?? reporte.tipo;
   const IconComp = TIPO_ICON[reporte.tipo] ?? CircleAlert;
   const iconBg = TIPO_ICON_BG[reporte.tipo] ?? "#F1F5F9";
   const iconColor = TIPO_ICON_COLOR[reporte.tipo] ?? "#475569";
-  const dir =
-    reporte.direccion ??
-    `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`;
   const hace = tiempoRelativo(reporte.created_at);
   const sev = SEV_LABEL[reporte.severidad] ?? "—";
   const sevCls = SEV_PILL[reporte.severidad] ?? SEV_PILL[3];

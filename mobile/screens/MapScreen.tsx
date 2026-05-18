@@ -811,7 +811,11 @@ export default function MapScreen() {
     setDestinoCoords(null);
     setRutaPolyline([]);
     setRutaInfo(null);
-  }, []);
+    // Tras cancelar, fitToCoordinates dejó la cámara en el destino. Volvemos
+    // a centrarla sobre el usuario para que la flecha de ubicación vuelva
+    // a ser visible (si no, el usuario percibe que "desaparece").
+    enfocarCamaraUsuario();
+  }, [enfocarCamaraUsuario]);
 
   const handleSeleccionarDestino = useCallback(
     async (lugar: LugarSugerido) => {

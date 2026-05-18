@@ -2,7 +2,14 @@
 import MapaGoogleMaps from "../MapaGoogleMaps";
 import ReporteFeed from "../ReporteFeed";
 
-export default function MapaView({ año, mes, reportes = [], newIds = new Set(), recientes = [], newRecentIds = new Set() }) {
+export default function MapaView({
+  año,
+  mes,
+  reportes = [],
+  newIds = new Set(),
+  recientes = [],
+  newRecentIds = new Set(),
+}) {
   return (
     <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
       {/* Map column — section is the positioning context; the inner card
@@ -35,7 +42,12 @@ export default function MapaView({ año, mes, reportes = [], newIds = new Set(),
           bg-[var(--surface)] p-4
         "
       >
-        <ReporteFeed reportes={reportes} newIds={newIds} recientes={recientes} newRecentIds={newRecentIds} />
+        <ReporteFeed
+          reportes={reportes}
+          newIds={newIds}
+          recientes={recientes}
+          newRecentIds={newRecentIds}
+        />
       </aside>
     </div>
   );

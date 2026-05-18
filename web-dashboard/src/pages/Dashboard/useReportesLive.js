@@ -15,14 +15,14 @@ const LIMIT = 50;
 const LIMIT_RECIENTES = 10;
 
 export function useReportesLive() {
-  const [reportes, setReportes]           = useState([]);
-  const [newIds, setNewIds]               = useState(new Set());
-  const [recientes, setRecientes]         = useState([]);
-  const [newRecentIds, setNewRecentIds]   = useState(new Set());
+  const [reportes, setReportes] = useState([]);
+  const [newIds, setNewIds] = useState(new Set());
+  const [recientes, setRecientes] = useState([]);
+  const [newRecentIds, setNewRecentIds] = useState(new Set());
 
-  const knownIds       = useRef(new Set());
+  const knownIds = useRef(new Set());
   const knownRecentIds = useRef(new Set());
-  const isFirstLoad    = useRef(true);
+  const isFirstLoad = useRef(true);
 
   const fetchReportes = useCallback(async () => {
     try {

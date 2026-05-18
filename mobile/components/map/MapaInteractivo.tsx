@@ -62,7 +62,11 @@ function MapaInteractivoBase(
   // del heatmap fuerza un remount limpio en cada toggle, garantizando que
   // todos los markers capturen un bitmap fresco al re-montarse.
   const heatmapKeySuffix = heatmapMode ? "heat" : "normal";
-  const userMarkerKey = `user-location-marker-${heatmapKeySuffix}`;
+  // El mismo síntoma aparece al montar/desmontar el marker de destino tras
+  // una búsqueda: la flecha del usuario se queda en blanco. Forzamos un
+  // remount limpio incluyendo la presencia del destino en la key.
+  const destinoKeySuffix = destinoCoords ? "ruta" : "libre";
+  const userMarkerKey = `user-location-marker-${heatmapKeySuffix}-${destinoKeySuffix}`;
 
   return (
     <MapView

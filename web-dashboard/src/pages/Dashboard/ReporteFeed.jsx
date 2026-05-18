@@ -1,6 +1,7 @@
 // src/pages/Dashboard/ReporteFeed.jsx
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { reverseGeocode } from "../../lib/geocode";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -35,11 +36,31 @@ const TIPO_ICON = {
 };
 
 const TIPO_TONE = {
-  accidente: { text: "text-[var(--crit)]", bg: "bg-[var(--crit-tint)]", border: "border-[var(--crit)]/25" },
-  hueco: { text: "text-[var(--warn)]", bg: "bg-[var(--warn-tint)]", border: "border-[var(--warn)]/25" },
-  arroyo: { text: "text-[var(--accent)]", bg: "bg-[var(--accent-tint)]", border: "border-[var(--accent)]/25" },
-  semaforo_danado: { text: "text-[var(--warn)]", bg: "bg-[var(--warn-tint)]", border: "border-[var(--warn)]/25" },
-  otro: { text: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-muted)]", border: "border-[var(--border)]" },
+  accidente: {
+    text: "text-[var(--crit)]",
+    bg: "bg-[var(--crit-tint)]",
+    border: "border-[var(--crit)]/25",
+  },
+  hueco: {
+    text: "text-[var(--warn)]",
+    bg: "bg-[var(--warn-tint)]",
+    border: "border-[var(--warn)]/25",
+  },
+  arroyo: {
+    text: "text-[var(--accent)]",
+    bg: "bg-[var(--accent-tint)]",
+    border: "border-[var(--accent)]/25",
+  },
+  semaforo_danado: {
+    text: "text-[var(--warn)]",
+    bg: "bg-[var(--warn-tint)]",
+    border: "border-[var(--warn)]/25",
+  },
+  otro: {
+    text: "text-[var(--text-secondary)]",
+    bg: "bg-[var(--surface-muted)]",
+    border: "border-[var(--border)]",
+  },
 };
 
 const SEVERIDAD_PRIORIDAD = {
@@ -59,14 +80,15 @@ const ESTADO_TONE = {
 // Color hex para el badge pill de cada estado
 const ESTADO_BADGE_COLOR = {
   pendiente: "#EAB308",
-  inactivo:  "#475569",
-  resuelto:  "#3B82F6",
+  inactivo: "#475569",
+  resuelto: "#3B82F6",
 };
 
 const PRIORIDAD_STYLES = {
   Crítica: "bg-[var(--crit-tint)] text-[var(--crit)] border-[var(--crit)]/30",
   Alta: "bg-[var(--warn-tint)] text-[var(--warn)] border-[var(--warn)]/30",
-  Media: "bg-[var(--accent-tint)] text-[var(--accent)] border-[var(--accent)]/30",
+  Media:
+    "bg-[var(--accent-tint)] text-[var(--accent)] border-[var(--accent)]/30",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -90,8 +112,9 @@ function adaptarReporte(r) {
     tipo: TIPO_LABEL[tipoKey] ?? tipoKey,
     Icon: TIPO_ICON[tipoKey] ?? Timer,
     tone: TIPO_TONE[tipoKey] ?? TIPO_TONE.otro,
-    direccion:
-      r.direccion ?? `${r.latitud?.toFixed(4)}, ${r.longitud?.toFixed(4)}`,
+    direccion: r.direccion?.trim() || null,
+    lat: r.latitud,
+    lng: r.longitud,
     descripcion: r.descripcion ?? "Sin descripción",
     hace: tiempoRelativo(r.created_at),
     createdAt: r.created_at,
@@ -103,6 +126,22 @@ function adaptarReporte(r) {
 
 // ─── Modal ────────────────────────────────────────────────────
 function ReporteModal({ reporte, onClose }) {
+  const [displayDir, setDisplayDir] = useState(reporte.direccion);
+
+  useEffect(() => {
+    if (reporte.direccion) {
+      setDisplayDir(reporte.direccion);
+      return;
+    }
+    if (reporte.lat == null || reporte.lng == null) {
+      setDisplayDir("Sin dirección");
+      return;
+    }
+    reverseGeocode(reporte.lat, reporte.lng).then((addr) => {
+      setDisplayDir(addr ?? "Sin dirección");
+    });
+  }, [reporte.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return createPortal(
     <AnimatePresence>
       <motion.div
@@ -189,7 +228,8 @@ function ReporteModal({ reporte, onClose }) {
                 "
               >
                 <Radio size={11} strokeWidth={2.4} />
-                {reporte.estado.charAt(0).toUpperCase() + reporte.estado.slice(1)}
+                {reporte.estado.charAt(0).toUpperCase() +
+                  reporte.estado.slice(1)}
               </span>
             </div>
           </div>
@@ -198,8 +238,17 @@ function ReporteModal({ reporte, onClose }) {
 
           {/* Info grid */}
           <div className="grid grid-cols-2 gap-3 px-5 py-4">
-            <InfoCell icon={MapPin} label="Dirección" value={reporte.direccion} span="col-span-2" />
-            <InfoCell icon={Clock} label="Reportado" value={`hace ${reporte.hace}`} />
+            <InfoCell
+              icon={MapPin}
+              label="Dirección"
+              value={displayDir ?? "…"}
+              span="col-span-2"
+            />
+            <InfoCell
+              icon={Clock}
+              label="Reportado"
+              value={`hace ${reporte.hace}`}
+            />
             <InfoCell icon={Timer} label="Categoría" value={reporte.tipo} />
             {reporte.descripcion !== "Sin descripción" && (
               <InfoCell
@@ -221,13 +270,19 @@ function InfoCell({ icon: Icon, label, value, span = "" }) {
   return (
     <div className={`flex items-start gap-2.5 ${span}`}>
       <div className="w-7 h-7 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={13} strokeWidth={2.1} className="text-[var(--text-tertiary)]" />
+        <Icon
+          size={13}
+          strokeWidth={2.1}
+          className="text-[var(--text-tertiary)]"
+        />
       </div>
       <div className="min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-tertiary)] font-mono mb-0.5">
           {label}
         </p>
-        <p className="text-[13px] text-[var(--text-primary)] leading-snug">{value}</p>
+        <p className="text-[13px] text-[var(--text-primary)] leading-snug">
+          {value}
+        </p>
       </div>
     </div>
   );
@@ -277,6 +332,25 @@ function EstadoBadge({ estado }) {
 // Single card — shared by both sections
 function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
   const Icon = r.Icon;
+  const [displayDir, setDisplayDir] = useState(r.direccion);
+  const pendingRef = useRef(false);
+
+  useEffect(() => {
+    if (r.direccion) {
+      setDisplayDir(r.direccion);
+      return;
+    }
+    if (r.lat == null || r.lng == null) {
+      setDisplayDir("Sin dirección");
+      return;
+    }
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    reverseGeocode(r.lat, r.lng).then((addr) => {
+      setDisplayDir(addr ?? "Sin dirección");
+    });
+  }, [r.id, r.lat, r.lng, r.direccion]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <motion.li
       key={r.id}
@@ -320,8 +394,12 @@ function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
               )}
             </div>
             <p className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5 truncate">
-              <MapPin size={10} strokeWidth={2.2} className="shrink-0 text-[var(--text-tertiary)]" />
-              <span className="truncate">{r.direccion}</span>
+              <MapPin
+                size={10}
+                strokeWidth={2.2}
+                className="shrink-0 text-[var(--text-tertiary)]"
+              />
+              <span className="truncate">{displayDir ?? "…"}</span>
             </p>
             <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
               {r.descripcion}
@@ -331,16 +409,15 @@ function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
             <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular">
               {r.hace}
             </span>
-            {esReciente
-              ? <EstadoBadge estado={r.estado} />
-              : (
-                <StatusDot
-                  tone={ESTADO_TONE[r.estado] ?? "muted"}
-                  pulse={r.estado === "pendiente"}
-                  size="sm"
-                />
-              )
-            }
+            {esReciente ? (
+              <EstadoBadge estado={r.estado} />
+            ) : (
+              <StatusDot
+                tone={ESTADO_TONE[r.estado] ?? "muted"}
+                pulse={r.estado === "pendiente"}
+                size="sm"
+              />
+            )}
           </div>
         </div>
       </button>
@@ -355,10 +432,11 @@ export default function ReporteFeed({
   newRecentIds = new Set(),
 }) {
   const [seleccionado, setSeleccionado] = useState(null);
-  const adaptados         = reportes.map(adaptarReporte);
+  const adaptados = reportes.map(adaptarReporte);
   const adaptadosRecientes = recientes.map(adaptarReporte);
-  const numNuevos = adaptados.filter((r) => newIds.has(r.id)).length
-    + adaptadosRecientes.filter((r) => newRecentIds.has(r.id)).length;
+  const numNuevos =
+    adaptados.filter((r) => newIds.has(r.id)).length +
+    adaptadosRecientes.filter((r) => newRecentIds.has(r.id)).length;
 
   const recientesVisibles = adaptadosRecientes.slice(0, MAX_RECIENTES);
   const hayMas = adaptadosRecientes.length > MAX_RECIENTES;

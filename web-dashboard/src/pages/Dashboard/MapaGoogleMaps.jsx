@@ -228,7 +228,8 @@ export default function MapaGoogleMaps({
       selectedLatLngRef.current = null;
     }
     window.addEventListener("close-reporte-popup", handleClosePopup);
-    return () => window.removeEventListener("close-reporte-popup", handleClosePopup);
+    return () =>
+      window.removeEventListener("close-reporte-popup", handleClosePopup);
   }, []);
 
   function onMapLoad(map) {
