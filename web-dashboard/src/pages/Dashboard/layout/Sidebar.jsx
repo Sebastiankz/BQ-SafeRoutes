@@ -218,6 +218,11 @@ export default function Sidebar({ seccion, setSeccion, reportesActivos = 0 }) {
 
   const expanded = pinned || hover;
 
+  function openLogin() {
+    window.dispatchEvent(new Event("close-reporte-popup"));
+    setShowLogin(true);
+  }
+
   function handleEnter() {
     if (pinned) return;
     clearTimeout(enterTimer.current);
@@ -327,7 +332,7 @@ export default function Sidebar({ seccion, setSeccion, reportesActivos = 0 }) {
             isAdmin={isAdmin}
             usuario={usuario}
             cerrarSesion={cerrarSesion}
-            onOpenLogin={() => setShowLogin(true)}
+            onOpenLogin={openLogin}
             expanded={expanded}
           />
         </nav>
@@ -363,7 +368,7 @@ export default function Sidebar({ seccion, setSeccion, reportesActivos = 0 }) {
           );
         })}
         <button
-          onClick={() => (isAdmin ? cerrarSesion() : setShowLogin(true))}
+          onClick={() => (isAdmin ? cerrarSesion() : openLogin())}
           className={`
             flex flex-col items-center gap-0.5 py-2.5 px-3.5
             text-[10px] font-semibold transition-colors cursor-pointer

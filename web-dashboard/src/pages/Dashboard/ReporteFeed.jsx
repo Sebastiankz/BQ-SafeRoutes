@@ -56,6 +56,13 @@ const ESTADO_TONE = {
   inactivo: "muted",
 };
 
+// Color hex para el badge pill de cada estado
+const ESTADO_BADGE_COLOR = {
+  pendiente: "#EAB308",
+  inactivo:  "#475569",
+  resuelto:  "#3B82F6",
+};
+
 const PRIORIDAD_STYLES = {
   Crítica: "bg-[var(--crit-tint)] text-[var(--crit)] border-[var(--crit)]/30",
   Alta: "bg-[var(--warn-tint)] text-[var(--warn)] border-[var(--warn)]/30",
@@ -227,10 +234,134 @@ function InfoCell({ icon: Icon, label, value, span = "" }) {
 }
 
 // ─── Feed ─────────────────────────────────────────────────────
-export default function ReporteFeed({ reportes = [], newIds = new Set() }) {
+const MAX_RECIENTES = 5;
+
+// Divider label between sections
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-2 my-3">
+      <div className="flex-1 border-t border-[var(--border)]" />
+      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)] font-mono shrink-0">
+        {children}
+      </span>
+      <div className="flex-1 border-t border-[var(--border)]" />
+    </div>
+  );
+}
+
+// Badge pill for inactive status
+function EstadoBadge({ estado }) {
+  const color = ESTADO_BADGE_COLOR[estado];
+  if (!color) return null;
+  const label = estado.charAt(0).toUpperCase() + estado.slice(1);
+  return (
+    <span
+      style={{
+        background: `${color}22`,
+        color,
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "1px 6px",
+        borderRadius: 10,
+        letterSpacing: "0.04em",
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+// Single card — shared by both sections
+function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
+  const Icon = r.Icon;
+  return (
+    <motion.li
+      key={r.id}
+      layout
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: esReciente ? 0.62 : 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
+      <button
+        onClick={onClick}
+        className={`
+          group w-full text-left p-3 rounded-xl
+          transition-all duration-200 cursor-pointer
+          border
+          ${
+            esNuevo
+              ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
+              : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
+          }
+        `}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className={`
+              w-9 h-9 rounded-xl flex items-center justify-center shrink-0
+              border ${r.tone.bg} ${r.tone.border}
+            `}
+          >
+            <Icon size={15} strokeWidth={2.2} className={r.tone.text} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[13px] font-bold text-[var(--text-primary)] truncate font-display tracking-tight">
+                {r.tipo}
+              </p>
+              {esNuevo && (
+                <span className="text-[9px] font-bold px-1.5 h-4 rounded bg-[var(--ok)] text-white leading-none inline-flex items-center font-mono uppercase tracking-wider">
+                  New
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5 truncate">
+              <MapPin size={10} strokeWidth={2.2} className="shrink-0 text-[var(--text-tertiary)]" />
+              <span className="truncate">{r.direccion}</span>
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
+              {r.descripcion}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular">
+              {r.hace}
+            </span>
+            {esReciente
+              ? <EstadoBadge estado={r.estado} />
+              : (
+                <StatusDot
+                  tone={ESTADO_TONE[r.estado] ?? "muted"}
+                  pulse={r.estado === "pendiente"}
+                  size="sm"
+                />
+              )
+            }
+          </div>
+        </div>
+      </button>
+    </motion.li>
+  );
+}
+
+export default function ReporteFeed({
+  reportes = [],
+  newIds = new Set(),
+  recientes = [],
+  newRecentIds = new Set(),
+}) {
   const [seleccionado, setSeleccionado] = useState(null);
-  const adaptados = reportes.map(adaptarReporte);
-  const numNuevos = adaptados.filter((r) => newIds.has(r.id)).length;
+  const adaptados         = reportes.map(adaptarReporte);
+  const adaptadosRecientes = recientes.map(adaptarReporte);
+  const numNuevos = adaptados.filter((r) => newIds.has(r.id)).length
+    + adaptadosRecientes.filter((r) => newRecentIds.has(r.id)).length;
+
+  const recientesVisibles = adaptadosRecientes.slice(0, MAX_RECIENTES);
+  const hayMas = adaptadosRecientes.length > MAX_RECIENTES;
 
   return (
     <>
@@ -260,74 +391,56 @@ export default function ReporteFeed({ reportes = [], newIds = new Set() }) {
         </div>
       </div>
 
-      {/* List */}
+      {/* ── Sección "En curso" ── */}
+      <SectionLabel>En curso</SectionLabel>
       <ul className="space-y-1.5">
         {adaptados.length === 0 && (
-          <li className="text-xs text-[var(--text-tertiary)] text-center py-6">
+          <li className="text-xs text-[var(--text-tertiary)] text-center py-4">
+            Sin reportes activos
+          </li>
+        )}
+        <AnimatePresence initial={false}>
+          {adaptados.map((r) => (
+            <ReporteCard
+              key={r.id}
+              r={r}
+              esNuevo={newIds.has(r.id)}
+              esReciente={false}
+              onClick={() => setSeleccionado(r)}
+            />
+          ))}
+        </AnimatePresence>
+      </ul>
+
+      {/* ── Sección "Recientes" ── */}
+      <SectionLabel>Recientes</SectionLabel>
+      <ul className="space-y-1.5">
+        {recientesVisibles.length === 0 && (
+          <li className="text-xs text-[var(--text-tertiary)] text-center py-4">
             Sin reportes recientes
           </li>
         )}
-        {adaptados.map((r) => {
-          const esNuevo = newIds.has(r.id);
-          const Icon = r.Icon;
-          return (
-            <li key={r.id}>
-              <button
-                onClick={() => setSeleccionado(r)}
-                className={`
-                  group w-full text-left p-3 rounded-xl
-                  transition-all duration-200 cursor-pointer
-                  border
-                  ${
-                    esNuevo
-                      ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
-                      : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
-                  }
-                `}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`
-                      w-9 h-9 rounded-xl flex items-center justify-center shrink-0
-                      border ${r.tone.bg} ${r.tone.border}
-                    `}
-                  >
-                    <Icon size={15} strokeWidth={2.2} className={r.tone.text} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[13px] font-bold text-[var(--text-primary)] truncate font-display tracking-tight">
-                        {r.tipo}
-                      </p>
-                      {esNuevo && (
-                        <span className="text-[9px] font-bold px-1.5 h-4 rounded bg-[var(--ok)] text-white leading-none inline-flex items-center font-mono uppercase tracking-wider">
-                          New
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5 truncate">
-                      <MapPin size={10} strokeWidth={2.2} className="shrink-0 text-[var(--text-tertiary)]" />
-                      <span className="truncate">{r.direccion}</span>
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
-                      {r.descripcion}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular">
-                      {r.hace}
-                    </span>
-                    <StatusDot
-                      tone={ESTADO_TONE[r.estado] ?? "muted"}
-                      pulse={r.estado === "pendiente"}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              </button>
-            </li>
-          );
-        })}
+        <AnimatePresence initial={false}>
+          {recientesVisibles.map((r) => (
+            <ReporteCard
+              key={r.id}
+              r={r}
+              esNuevo={newRecentIds.has(r.id)}
+              esReciente={true}
+              onClick={() => setSeleccionado(r)}
+            />
+          ))}
+        </AnimatePresence>
+        {hayMas && (
+          <li className="pt-1">
+            <p className="text-[11px] text-[var(--text-tertiary)] text-center font-mono">
+              + {adaptadosRecientes.length - MAX_RECIENTES} más — ver en{" "}
+              <span className="text-[var(--accent)] font-bold cursor-pointer hover:underline">
+                Reportes
+              </span>
+            </p>
+          </li>
+        )}
       </ul>
 
       {seleccionado && (

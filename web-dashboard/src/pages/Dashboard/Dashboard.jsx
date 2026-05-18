@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [seccion, setSeccion] = useState("mapa");
 
   const { result, loading } = useDashboardData(año, gravedad, mes);
-  const { reportes, newIds } = useReportesLive();
+  const { reportes, newIds, recientes, newRecentIds } = useReportesLive();
 
   return (
     <DashboardLayout
@@ -29,7 +29,7 @@ export default function Dashboard() {
       reportesActivos={reportes.length}
     >
       {seccion === "mapa" && (
-        <MapaView año={año} mes={mes} reportes={reportes} newIds={newIds} />
+        <MapaView año={año} mes={mes} reportes={reportes} newIds={newIds} recientes={recientes} newRecentIds={newRecentIds} />
       )}
       {seccion === "analitica" && (
         <AnaliticaView result={result} loading={loading} kpi={result?.kpi} />

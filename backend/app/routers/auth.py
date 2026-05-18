@@ -4,8 +4,11 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from ..config import get_settings
+from ..database import get_db
 from ..schemas.auth import (
     AuthResponse,
     LoginIn,
@@ -164,3 +167,16 @@ def logout(
         _clear_refresh_cookie(response)
 
     return LogoutOut(ok=True)
+
+
+@router.get("/users/count")
+def count_users(db: Session = Depends(get_db)):
+    """Devuelve el total de usuarios registrados en auth.users (no eliminados)."""
+    try:
+        result = db.execute(
+            text("SELECT COUNT(*) FROM auth.users WHERE deleted_at IS NULL")
+        )
+        total = result.scalar()
+        return {"count": int(total or 0)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
