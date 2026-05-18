@@ -1,6 +1,8 @@
 import { useState } from "react";
+import type { ComponentProps } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -14,17 +16,25 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import type { CrearReportePayload, TipoReporte } from "../services/reportes";
+import type {
+  CrearReportePayload,
+  Reporte,
+  TipoReporte,
+} from "../services/reportes";
 import { crearReporte } from "../services/reportes";
 import { subirFotoReporte } from "../services/storage";
+import { colors, iosTitleFont, radii, shadow } from "../theme/tokens";
 
-const TIPOS: { value: TipoReporte; label: string }[] = [
-  { value: "accidente", label: "Accidente" },
-  { value: "hueco", label: "Hueco" },
-  { value: "arroyo", label: "Arroyo" },
-  { value: "semaforo_danado", label: "Semáforo" },
-  { value: "otro", label: "Otro" },
+type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+const TIPOS: { value: TipoReporte; label: string; icono: IconName; color: string }[] = [
+  { value: "accidente", label: "Accidente",  icono: "car-emergency",  color: "#DC2626" },
+  { value: "hueco",     label: "Hueco",      icono: "road-variant",   color: "#D97706" },
+  { value: "arroyo",    label: "Arroyo",     icono: "waves",          color: "#2563EB" },
+  { value: "semaforo_danado", label: "Semáforo", icono: "traffic-light", color: "#7C3AED" },
+  { value: "otro",      label: "Otro",       icono: "alert-circle",   color: "#6B7280" },
 ];
 
 interface Props {
@@ -35,8 +45,6 @@ interface Props {
   onCreado: () => void;
   /** JWT del usuario logueado (obligatorio al enviar). */
   accessToken: string;
-  /** UUID del usuario (para nombrar archivo en Storage). */
-  userId: string;
 }
 
 function cerrarTodo(onDismiss: () => void) {
@@ -51,7 +59,6 @@ export default function NuevoReporteModal({
   longitud,
   onCreado,
   accessToken,
-  userId,
 }: Props) {
   const [tipo, setTipo] = useState<TipoReporte>("hueco");
   const [descripcion, setDescripcion] = useState("");
@@ -91,6 +98,24 @@ export default function NuevoReporteModal({
     }
   }
 
+  function mostrarFeedback(reporte: Reporte) {
+    if (reporte.reporte_padre_id !== null) {
+      Alert.alert(
+        "¡Gracias por confirmar!",
+        "Tu reporte se sumó a otro cercano del mismo tipo y ayuda a validarlo. Cuando tres usuarios coincidan, será visible en el mapa.",
+      );
+      return;
+    }
+    if (reporte.estado === "pendiente") {
+      Alert.alert(
+        "Reporte en revisión",
+        "Tu reporte fue registrado y está en revisión. Será visible en el mapa cuando otros usuarios reporten lo mismo cerca.",
+      );
+      return;
+    }
+    Alert.alert("Reporte creado", "Tu reporte ya está visible en el mapa.");
+  }
+
   async function enviar() {
     Keyboard.dismiss();
     setGuardando(true);
@@ -98,7 +123,7 @@ export default function NuevoReporteModal({
     try {
       let fotoUrl: string | null = null;
       if (fotoUri) {
-        fotoUrl = await subirFotoReporte(fotoUri, userId);
+        fotoUrl = await subirFotoReporte(fotoUri, accessToken);
       }
       const payload: CrearReportePayload = {
         tipo,
@@ -108,11 +133,12 @@ export default function NuevoReporteModal({
         longitud,
         severidad,
       };
-      await crearReporte(payload, accessToken);
+      const reporte = await crearReporte(payload, accessToken);
       setDescripcion("");
       setFotoUri(null);
       onCreado();
       onDismiss();
+      mostrarFeedback(reporte);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -147,7 +173,11 @@ export default function NuevoReporteModal({
                 style={styles.btnCerrar}
                 onPress={() => cerrarTodo(onDismiss)}
               >
-                <Text style={styles.btnCerrarTxt}>✕</Text>
+                <MaterialCommunityIcons
+                  color={colors.textMuted}
+                  name="close"
+                  size={20}
+                />
               </Pressable>
             </View>
             <Text style={styles.sub}>
@@ -161,19 +191,54 @@ export default function NuevoReporteModal({
               nestedScrollEnabled
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.etiqueta}>Tipo</Text>
+              <Text style={styles.etiqueta}>¿Qué ves?</Text>
               <View style={styles.gridTipos}>
-                {TIPOS.map((t) => (
-                  <Pressable
-                    key={t.value}
-                    accessibilityRole="button"
-                    disabled={guardando}
-                    style={[styles.chip, tipo === t.value && styles.chipActivo]}
-                    onPress={() => setTipo(t.value)}
-                  >
-                    <Text style={[styles.chipTxt, tipo === t.value && styles.chipTxtActivo]}>{t.label}</Text>
-                  </Pressable>
-                ))}
+                {TIPOS.map((t) => {
+                  const activo = tipo === t.value;
+                  return (
+                    <Pressable
+                      key={t.value}
+                      accessibilityLabel={t.label}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: activo }}
+                      disabled={guardando}
+                      onPress={() => setTipo(t.value)}
+                      style={({ pressed }) => [
+                        styles.tipoItem,
+                        pressed && { opacity: 0.72 },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.tipoCirculo,
+                          { backgroundColor: activo ? t.color : `${t.color}1F` },
+                          activo && {
+                            shadowColor: t.color,
+                            shadowOpacity: 0.45,
+                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 4 },
+                            elevation: 8,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={t.icono}
+                          size={32}
+                          color={activo ? "#fff" : t.color}
+                        />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.tipoLabel,
+                          activo && { color: t.color, fontWeight: "800" },
+                        ]}
+                      >
+                        {t.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
               <Text style={styles.etiqueta}>Severidad (1–5)</Text>
@@ -183,10 +248,20 @@ export default function NuevoReporteModal({
                     key={n}
                     accessibilityRole="button"
                     disabled={guardando}
-                    style={[styles.sevBtn, severidad === n && styles.sevBtnActivo]}
+                    style={[
+                      styles.sevBtn,
+                      severidad === n && styles.sevBtnActivo,
+                    ]}
                     onPress={() => setSeveridad(n)}
                   >
-                    <Text style={[styles.sevTxt, severidad === n && styles.sevTxtActivo]}>{n}</Text>
+                    <Text
+                      style={[
+                        styles.sevTxt,
+                        severidad === n && styles.sevTxtActivo,
+                      ]}
+                    >
+                      {n}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -229,7 +304,11 @@ export default function NuevoReporteModal({
                 )}
               </View>
               {fotoUri && (
-                <Image source={{ uri: fotoUri }} style={styles.preview} resizeMode="cover" />
+                <Image
+                  source={{ uri: fotoUri }}
+                  style={styles.preview}
+                  resizeMode="cover"
+                />
               )}
 
               <Pressable
@@ -276,7 +355,7 @@ export default function NuevoReporteModal({
 const styles = StyleSheet.create({
   fondo: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   kav: {
@@ -284,9 +363,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   tarjeta: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: Platform.select({ ios: 28, android: 20, default: 24 }),
@@ -298,70 +379,138 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  titulo: { fontSize: 20, fontWeight: "700", color: "#1a202c", flex: 1 },
+  titulo: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
+    flex: 1,
+    fontFamily: iosTitleFont,
+    letterSpacing: 0.25,
+  },
   btnCerrar: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 20,
-    backgroundColor: "#edf2f7",
+    backgroundColor: colors.surfaceMuted,
   },
-  btnCerrarTxt: { fontSize: 18, color: "#4a5568", fontWeight: "600" },
-  sub: { fontSize: 12, color: "#718096", marginBottom: 16 },
-  etiqueta: { fontSize: 13, fontWeight: "600", color: "#4a5568", marginBottom: 8 },
-  gridTipos: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#edf2f7",
+  sub: { fontSize: 12, color: colors.textMuted, marginBottom: 16 },
+  etiqueta: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textMuted,
+    marginBottom: 8,
   },
-  chipActivo: { backgroundColor: "#E53E3E" },
-  chipTxt: { fontSize: 13, color: "#2d3748" },
-  chipTxtActivo: { color: "#fff", fontWeight: "600" },
+  gridTipos: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  tipoItem: {
+    width: "33.33%",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  tipoCirculo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  tipoLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text,
+    textAlign: "center",
+    letterSpacing: 0.1,
+  },
   filaSev: { flexDirection: "row", gap: 10, marginBottom: 14 },
   sevBtn: {
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#edf2f7",
+    backgroundColor: colors.surfaceMuted,
   },
-  sevBtnActivo: { backgroundColor: "#2c5282" },
-  sevTxt: { fontSize: 16, fontWeight: "600", color: "#4a5568" },
+  sevBtnActivo: { backgroundColor: colors.accent },
+  sevTxt: { fontSize: 16, fontWeight: "700", color: colors.textMuted },
   sevTxtActivo: { color: "#fff" },
   input: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
     padding: 12,
     fontSize: 15,
     minHeight: 80,
     textAlignVertical: "top",
-    color: "#1a202c",
+    color: colors.text,
     marginBottom: 8,
+    backgroundColor: colors.surfaceMuted,
   },
-  filaFoto: { flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 10 },
-  btnFoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#edf2f7" },
-  btnFotoTxt: { fontSize: 13, fontWeight: "600", color: "#2d3748" },
-  quitarFoto: { fontSize: 18, color: "#c53030", paddingHorizontal: 6 },
-  preview: { width: "100%", height: 140, borderRadius: 10, marginBottom: 10 },
-  btnTeclado: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 4, marginBottom: 12 },
-  btnTecladoTxt: { fontSize: 15, color: "#2b6cb0", fontWeight: "600" },
-  error: { color: "#c53030", fontSize: 13, marginBottom: 12 },
-  acciones: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 6, paddingBottom: 8 },
+  filaFoto: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  btnFoto: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  btnFotoTxt: { fontSize: 13, fontWeight: "700", color: colors.text },
+  quitarFoto: { fontSize: 18, color: colors.danger, paddingHorizontal: 6 },
+  preview: {
+    width: "100%",
+    height: 140,
+    borderRadius: radii.sm,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  btnTeclado: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+  btnTecladoTxt: { fontSize: 15, color: colors.primaryDark, fontWeight: "700" },
+  error: {
+    color: colors.danger,
+    fontSize: 13,
+    marginBottom: 12,
+    backgroundColor: "rgba(220,38,38,0.08)",
+    borderRadius: radii.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  acciones: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 6,
+    paddingBottom: 8,
+  },
   btn: {
     minWidth: 110,
     paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
   btnGhost: { backgroundColor: "transparent" },
-  btnGhostTxt: { color: "#718096", fontWeight: "600", fontSize: 15 },
-  btnPrimario: { backgroundColor: "#E53E3E" },
+  btnGhostTxt: { color: colors.textMuted, fontWeight: "700", fontSize: 15 },
+  btnPrimario: {
+    backgroundColor: colors.primary,
+    ...shadow.floating,
+  },
   btnPrimTxt: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });

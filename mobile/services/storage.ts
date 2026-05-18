@@ -1,28 +1,70 @@
-import { readAsStringAsync } from "expo-file-system/legacy";
-import { decode } from "base64-arraybuffer";
+import { apiBaseUrl } from "./config";
 
-import { supabase } from "../lib/supabase";
+type UploadResponse = {
+  foto_url: string;
+};
 
-const BUCKET = "reportes-fotos";
+function contentTypeFromUri(localUri: string): string {
+  const lower = localUri.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
+}
+
+function fileNameFromUri(localUri: string): string {
+  const parts = localUri.split("/");
+  const last = parts[parts.length - 1]?.trim();
+  if (last) return last;
+  return `foto-${Date.now()}.jpg`;
+}
 
 /**
- * Sube una imagen desde una URI local al bucket de Supabase Storage.
- * Devuelve la URL pública de la imagen subida.
+ * Sube una imagen al backend para que este la persista en Storage.
+ * Devuelve la URL pública de la imagen.
  */
-export async function subirFotoReporte(localUri: string, userId: string): Promise<string> {
-  const ext = localUri.split(".").pop()?.toLowerCase() ?? "jpg";
-  const fileName = `${userId}/${Date.now()}.${ext}`;
-  const contentType = ext === "png" ? "image/png" : "image/jpeg";
+export async function subirFotoReporte(
+  localUri: string,
+  accessToken: string,
+): Promise<string> {
+  const base = apiBaseUrl();
+  if (!base) {
+    throw new Error(
+      "Define EXPO_PUBLIC_API_URL en mobile/.env (URL de tu API FastAPI)",
+    );
+  }
 
-  const base64 = await readAsStringAsync(localUri, { encoding: "base64" });
+  const form = new FormData();
+  form.append("file", {
+    uri: localUri,
+    name: fileNameFromUri(localUri),
+    type: contentTypeFromUri(localUri),
+  } as any);
 
-  const { error } = await supabase.storage.from(BUCKET).upload(fileName, decode(base64), {
-    contentType,
-    upsert: false,
+  const res = await fetch(`${base}/storage/reportes/foto`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: form,
   });
 
-  if (error) throw new Error(`Error subiendo foto: ${error.message}`);
+  if (!res.ok) {
+    let message = `${res.status} ${res.statusText}`;
+    try {
+      const payload = (await res.json()) as { detail?: unknown };
+      if (typeof payload.detail === "string") message = payload.detail;
+      else if (payload.detail !== undefined)
+        message = JSON.stringify(payload.detail);
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
-  return data.publicUrl;
+  const body = (await res.json()) as UploadResponse;
+  if (!body?.foto_url) {
+    throw new Error("La API no devolvió foto_url tras subir la imagen.");
+  }
+  return body.foto_url;
 }

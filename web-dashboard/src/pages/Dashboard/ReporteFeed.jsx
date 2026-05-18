@@ -1,144 +1,531 @@
 // src/pages/Dashboard/ReporteFeed.jsx
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { X, MapPin, Clock, AlertTriangle, Zap, Navigation, Timer } from 'lucide-react';
-// ── Data simulada de 10 reportes ciudadanos ──────────────────
-const REPORTES = [
-  { id: 1,  tipo: 'Semáforo dañado',       icono: 'zap',    color: 'text-yellow-500', direccion: 'Calle 84 con 51B',               descripcion: 'Semáforo intermitente genera caos en hora pico.',         hace: '19 min',  estado: 'Activo',   prioridad: 'Alta'   },
-  { id: 2,  tipo: 'Hueco peligroso',        icono: 'alert',  color: 'text-orange-500', direccion: 'Carrera 43 con Calle 76',         descripcion: 'Bache profundo en carril izquierdo.',                     hace: '35 min',  estado: 'Activo',   prioridad: 'Alta'   },
-  { id: 3,  tipo: 'Accidente leve',         icono: 'nav',    color: 'text-blue-500',   direccion: 'Av. Circunvalar (Sector Alameda)', descripcion: 'Choque simple entre dos particulares.',                   hace: '45 min',  estado: 'Atendido', prioridad: 'Media'  },
-  { id: 4,  tipo: 'Congestión extrema',     icono: 'timer',  color: 'text-red-500',    direccion: 'Vía 40 con Calle 80',             descripcion: 'Tráfico lento por labores de mantenimiento vial.',        hace: '1 hora',  estado: 'Activo',   prioridad: 'Alta'   },
-  { id: 5,  tipo: 'Ciclista en vía principal', icono: 'nav', color: 'text-green-500',  direccion: 'Calle 72 con Carrera 54',         descripcion: 'Grupo de ciclistas sin escolta.',                         hace: '2 horas', estado: 'Activo',   prioridad: 'Media'  },
-  { id: 6,  tipo: 'Derrame de aceite',      icono: 'alert',  color: 'text-orange-500', direccion: 'Carrera 46 con Calle 50',         descripcion: 'Mancha de aceite en calzada, riesgo de accidente.',       hace: '2 horas', estado: 'Activo',   prioridad: 'Alta'   },
-  { id: 7,  tipo: 'Semáforo apagado',       icono: 'zap',    color: 'text-yellow-500', direccion: 'Calle 30 con Carrera 38',         descripcion: 'Semáforo sin energía desde las 6am.',                     hace: '3 horas', estado: 'Activo',   prioridad: 'Alta'   },
-  { id: 8,  tipo: 'Accidente grave',        icono: 'nav',    color: 'text-red-500',    direccion: 'Av. Murillo con Calle 17',         descripcion: 'Colisión múltiple, dos heridos trasladados.',             hace: '3 horas', estado: 'Atendido', prioridad: 'Crítica'},
-  { id: 9,  tipo: 'Vehículo varado',        icono: 'timer',  color: 'text-slate-500',  direccion: 'Puente Pumarejo',                  descripcion: 'Tractomula varada bloquea carril derecho.',               hace: '4 horas', estado: 'Activo',   prioridad: 'Media'  },
-  { id: 10, tipo: 'Inundación vial',        icono: 'alert',  color: 'text-blue-500',   direccion: 'Calle 45 con Carrera 21',         descripcion: 'Agua acumulada por lluvia dificulta el paso vehicular.',  hace: '5 horas', estado: 'Activo',   prioridad: 'Alta'   },
-];
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { reverseGeocode } from "../../lib/geocode";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertTriangle,
+  Bell,
+  Camera,
+  Clock,
+  FileText,
+  MapPin,
+  Navigation2,
+  Radio,
+  Timer,
+  X,
+  Zap,
+} from "lucide-react";
+import StatusDot from "../../components/ui/StatusDot";
 
-const ICONO_MAP = {
-  zap:   <Zap size={14} />,
-  alert: <AlertTriangle size={14} />,
-  nav:   <Navigation size={14} />,
-  timer: <Timer size={14} />,
+// ─── Constants ────────────────────────────────────────────────
+const TIPO_LABEL = {
+  accidente: "Accidente",
+  hueco: "Hueco peligroso",
+  arroyo: "Arroyo / Inundación",
+  semaforo_danado: "Semáforo dañado",
+  otro: "Otro",
 };
 
-const PRIORIDAD_COLOR = {
-  'Crítica': 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-  'Alta':    'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  'Media':   'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+const TIPO_ICON = {
+  accidente: Navigation2,
+  hueco: AlertTriangle,
+  arroyo: AlertTriangle,
+  semaforo_danado: Zap,
+  otro: Timer,
 };
 
-// ── Modal de detalle ─────────────────────────────────────────
+const TIPO_TONE = {
+  accidente: {
+    text: "text-[var(--crit)]",
+    bg: "bg-[var(--crit-tint)]",
+    border: "border-[var(--crit)]/25",
+  },
+  hueco: {
+    text: "text-[var(--warn)]",
+    bg: "bg-[var(--warn-tint)]",
+    border: "border-[var(--warn)]/25",
+  },
+  arroyo: {
+    text: "text-[var(--accent)]",
+    bg: "bg-[var(--accent-tint)]",
+    border: "border-[var(--accent)]/25",
+  },
+  semaforo_danado: {
+    text: "text-[var(--warn)]",
+    bg: "bg-[var(--warn-tint)]",
+    border: "border-[var(--warn)]/25",
+  },
+  otro: {
+    text: "text-[var(--text-secondary)]",
+    bg: "bg-[var(--surface-muted)]",
+    border: "border-[var(--border)]",
+  },
+};
+
+const SEVERIDAD_PRIORIDAD = {
+  1: "Media",
+  2: "Media",
+  3: "Alta",
+  4: "Alta",
+  5: "Crítica",
+};
+
+const ESTADO_TONE = {
+  pendiente: "warn",
+  confirmado: "ok",
+  inactivo: "muted",
+};
+
+// Color hex para el badge pill de cada estado
+const ESTADO_BADGE_COLOR = {
+  pendiente: "#EAB308",
+  inactivo: "#475569",
+  resuelto: "#3B82F6",
+};
+
+const PRIORIDAD_STYLES = {
+  Crítica: "bg-[var(--crit-tint)] text-[var(--crit)] border-[var(--crit)]/30",
+  Alta: "bg-[var(--warn-tint)] text-[var(--warn)] border-[var(--warn)]/30",
+  Media:
+    "bg-[var(--accent-tint)] text-[var(--accent)] border-[var(--accent)]/30",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────
+function tiempoRelativo(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400) {
+    const h = Math.floor(diff / 3600);
+    return `${h} h`;
+  }
+  const d = Math.floor(diff / 86400);
+  return `${d} d`;
+}
+
+function adaptarReporte(r) {
+  const tipoKey = r.tipo ?? "otro";
+  return {
+    id: r.id,
+    tipoKey,
+    tipo: TIPO_LABEL[tipoKey] ?? tipoKey,
+    Icon: TIPO_ICON[tipoKey] ?? Timer,
+    tone: TIPO_TONE[tipoKey] ?? TIPO_TONE.otro,
+    direccion: r.direccion?.trim() || null,
+    lat: r.latitud,
+    lng: r.longitud,
+    descripcion: r.descripcion ?? "Sin descripción",
+    hace: tiempoRelativo(r.created_at),
+    createdAt: r.created_at,
+    estado: r.estado ?? "pendiente",
+    prioridad: SEVERIDAD_PRIORIDAD[r.severidad] ?? "Media",
+    foto_url: r.foto_url ?? null,
+  };
+}
+
+// ─── Modal ────────────────────────────────────────────────────
 function ReporteModal({ reporte, onClose }) {
-  return createPortal(
-    <div
-      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      {/* Tarjeta del modal — stopPropagation evita cerrar al hacer clic adentro */}
-      <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header del modal */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`${reporte.color} p-2 bg-slate-100 dark:bg-gray-700 rounded-lg`}>
-              {ICONO_MAP[reporte.icono]}
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-800 dark:text-white">{reporte.tipo}</h2>
-              <p className="text-xs text-slate-400 dark:text-gray-400">Reporte #{reporte.id}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
+  const [displayDir, setDisplayDir] = useState(reporte.direccion);
 
-        {/* Cuerpo */}
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
-            <MapPin size={14} className="text-blue-500 shrink-0" />
-            <span>{reporte.direccion}</span>
-          </div>
-          <div className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
-            <Clock size={14} className="text-slate-400 shrink-0" />
-            <span>Reportado hace {reporte.hace}</span>
-          </div>
-          <p className="text-slate-600 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 rounded-lg p-3">
-            {reporte.descripcion}
-          </p>
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Prioridad:</span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${PRIORIDAD_COLOR[reporte.prioridad]}`}>
+  useEffect(() => {
+    if (reporte.direccion) {
+      setDisplayDir(reporte.direccion);
+      return;
+    }
+    if (reporte.lat == null || reporte.lng == null) {
+      setDisplayDir("Sin dirección");
+      return;
+    }
+    reverseGeocode(reporte.lat, reporte.lng).then((addr) => {
+      setDisplayDir(addr ?? "Sin dirección");
+    });
+  }, [reporte.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        key="backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/55 backdrop-blur-md"
+        onClick={onClose}
+      >
+        <motion.div
+          key="card"
+          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="
+            relative w-full max-w-lg
+            bg-[var(--surface)] rounded-2xl overflow-hidden
+            shadow-[var(--shadow-pop)] border border-[var(--border)]
+          "
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Photo with overlay */}
+          {reporte.foto_url ? (
+            <div className="relative h-[180px] overflow-hidden">
+              <img
+                src={reporte.foto_url}
+                alt="Foto del reporte"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/45" />
+              <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2 h-6 rounded-full bg-black/55 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                <Camera size={11} strokeWidth={2.5} /> Foto del reporte
+              </span>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center bg-black/55 text-white hover:bg-black/75 backdrop-blur-sm transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                <X size={16} strokeWidth={2.3} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 px-5 pt-5">
+              <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)] font-mono">
+                <Camera size={12} /> Sin foto adjunta
+              </span>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-muted)] transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                <X size={16} strokeWidth={2.3} />
+              </button>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="px-5 pt-4 pb-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)] font-mono">
+              Reporte · #{String(reporte.id).slice(0, 8)}
+            </p>
+            <h2 className="font-display text-[20px] font-bold tracking-tight text-[var(--text-primary)] leading-tight mt-1">
+              {reporte.tipo}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span
+                className={`
+                  inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full
+                  text-[11px] font-bold border
+                  ${PRIORIDAD_STYLES[reporte.prioridad] ?? PRIORIDAD_STYLES.Media}
+                `}
+              >
+                <AlertTriangle size={11} strokeWidth={2.4} />
                 {reporte.prioridad}
               </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Estado:</span>
-              <span className={`text-xs font-bold ${reporte.estado === 'Atendido' ? 'text-emerald-500' : 'text-orange-500'}`}>
-                ● {reporte.estado}
+              <span
+                className="
+                  inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full
+                  text-[11px] font-bold border
+                  bg-[var(--ok-tint)] text-[var(--ok)] border-[var(--ok)]/30
+                "
+              >
+                <Radio size={11} strokeWidth={2.4} />
+                {reporte.estado.charAt(0).toUpperCase() +
+                  reporte.estado.slice(1)}
               </span>
             </div>
           </div>
-        </div>
-      </div>
-    </div>,
-    document.body
+
+          <div className="border-t border-[var(--border)]" />
+
+          {/* Info grid */}
+          <div className="grid grid-cols-2 gap-3 px-5 py-4">
+            <InfoCell
+              icon={MapPin}
+              label="Dirección"
+              value={displayDir ?? "…"}
+              span="col-span-2"
+            />
+            <InfoCell
+              icon={Clock}
+              label="Reportado"
+              value={`hace ${reporte.hace}`}
+            />
+            <InfoCell icon={Timer} label="Categoría" value={reporte.tipo} />
+            {reporte.descripcion !== "Sin descripción" && (
+              <InfoCell
+                icon={FileText}
+                label="Descripción"
+                value={reporte.descripcion}
+                span="col-span-2"
+              />
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
-// ── Feed principal ────────────────────────────────────────────
-export default function ReporteFeed() {
+function InfoCell({ icon: Icon, label, value, span = "" }) {
+  return (
+    <div className={`flex items-start gap-2.5 ${span}`}>
+      <div className="w-7 h-7 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center shrink-0 mt-0.5">
+        <Icon
+          size={13}
+          strokeWidth={2.1}
+          className="text-[var(--text-tertiary)]"
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-tertiary)] font-mono mb-0.5">
+          {label}
+        </p>
+        <p className="text-[13px] text-[var(--text-primary)] leading-snug">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Feed ─────────────────────────────────────────────────────
+const MAX_RECIENTES = 5;
+
+// Divider label between sections
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-2 my-3">
+      <div className="flex-1 border-t border-[var(--border)]" />
+      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)] font-mono shrink-0">
+        {children}
+      </span>
+      <div className="flex-1 border-t border-[var(--border)]" />
+    </div>
+  );
+}
+
+// Badge pill for inactive status
+function EstadoBadge({ estado }) {
+  const color = ESTADO_BADGE_COLOR[estado];
+  if (!color) return null;
+  const label = estado.charAt(0).toUpperCase() + estado.slice(1);
+  return (
+    <span
+      style={{
+        background: `${color}22`,
+        color,
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "1px 6px",
+        borderRadius: 10,
+        letterSpacing: "0.04em",
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+// Single card — shared by both sections
+function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
+  const Icon = r.Icon;
+  const [displayDir, setDisplayDir] = useState(r.direccion);
+  const pendingRef = useRef(false);
+
+  useEffect(() => {
+    if (r.direccion) {
+      setDisplayDir(r.direccion);
+      return;
+    }
+    if (r.lat == null || r.lng == null) {
+      setDisplayDir("Sin dirección");
+      return;
+    }
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    reverseGeocode(r.lat, r.lng).then((addr) => {
+      setDisplayDir(addr ?? "Sin dirección");
+    });
+  }, [r.id, r.lat, r.lng, r.direccion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <motion.li
+      key={r.id}
+      layout
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: esReciente ? 0.62 : 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
+      <button
+        onClick={onClick}
+        className={`
+          group w-full text-left p-3 rounded-xl
+          transition-all duration-200 cursor-pointer
+          border
+          ${
+            esNuevo
+              ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
+              : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
+          }
+        `}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className={`
+              w-9 h-9 rounded-xl flex items-center justify-center shrink-0
+              border ${r.tone.bg} ${r.tone.border}
+            `}
+          >
+            <Icon size={15} strokeWidth={2.2} className={r.tone.text} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[13px] font-bold text-[var(--text-primary)] truncate font-display tracking-tight">
+                {r.tipo}
+              </p>
+              {esNuevo && (
+                <span className="text-[9px] font-bold px-1.5 h-4 rounded bg-[var(--ok)] text-white leading-none inline-flex items-center font-mono uppercase tracking-wider">
+                  New
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5 truncate">
+              <MapPin
+                size={10}
+                strokeWidth={2.2}
+                className="shrink-0 text-[var(--text-tertiary)]"
+              />
+              <span className="truncate">{displayDir ?? "…"}</span>
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
+              {r.descripcion}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular">
+              {r.hace}
+            </span>
+            {esReciente ? (
+              <EstadoBadge estado={r.estado} />
+            ) : (
+              <StatusDot
+                tone={ESTADO_TONE[r.estado] ?? "muted"}
+                pulse={r.estado === "pendiente"}
+                size="sm"
+              />
+            )}
+          </div>
+        </div>
+      </button>
+    </motion.li>
+  );
+}
+
+export default function ReporteFeed({
+  reportes = [],
+  newIds = new Set(),
+  recientes = [],
+  newRecentIds = new Set(),
+}) {
   const [seleccionado, setSeleccionado] = useState(null);
+  const adaptados = reportes.map(adaptarReporte);
+  const adaptadosRecientes = recientes.map(adaptarReporte);
+  const numNuevos =
+    adaptados.filter((r) => newIds.has(r.id)).length +
+    adaptadosRecientes.filter((r) => newRecentIds.has(r.id)).length;
+
+  const recientesVisibles = adaptadosRecientes.slice(0, MAX_RECIENTES);
+  const hayMas = adaptadosRecientes.length > MAX_RECIENTES;
 
   return (
     <>
-      {/* Header del aside */}
-      <div className="mb-4 pb-3 border-b border-slate-100 dark:border-gray-700">
-        <h2 className="font-bold text-slate-800 dark:text-white text-sm">Reportes Ciudadanos</h2>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs text-slate-400 dark:text-gray-400 uppercase tracking-widest">
-            En vivo (Barranquilla)
-          </span>
+      {/* Header */}
+      <div className="mb-4 pb-3 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)] font-mono">
+            Live Feed
+          </p>
+          {numNuevos > 0 && (
+            <motion.span
+              key={numNuevos}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--ok-tint)] text-[var(--ok)] text-[10px] font-bold"
+            >
+              <Bell size={10} strokeWidth={2.5} />
+              {numNuevos} nuevo{numNuevos > 1 ? "s" : ""}
+            </motion.span>
+          )}
+        </div>
+        <h2 className="font-display text-[16px] font-bold tracking-tight text-[var(--text-primary)] leading-tight mt-1">
+          Reportes Ciudadanos
+        </h2>
+        <div className="flex items-center gap-2 mt-1.5">
+          <StatusDot tone="ok" label="Sincronizado en vivo" />
         </div>
       </div>
 
-      {/* Lista con scroll */}
-      <div className="space-y-1">
-        {REPORTES.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => setSeleccionado(r)}
-            className="w-full text-left p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className={`${r.color} mt-0.5 shrink-0`}>{ICONO_MAP[r.icono]}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 dark:text-gray-200 truncate">{r.tipo}</p>
-                <p className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
-                  <MapPin size={10} /> {r.direccion}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-gray-400 mt-1 line-clamp-1">{r.descripcion}</p>
-              </div>
-              <span className="text-[10px] text-slate-300 dark:text-gray-600 shrink-0 whitespace-nowrap">
-                {r.hace}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
+      {/* ── Sección "En curso" ── */}
+      <SectionLabel>En curso</SectionLabel>
+      <ul className="space-y-1.5">
+        {adaptados.length === 0 && (
+          <li className="text-xs text-[var(--text-tertiary)] text-center py-4">
+            Sin reportes activos
+          </li>
+        )}
+        <AnimatePresence initial={false}>
+          {adaptados.map((r) => (
+            <ReporteCard
+              key={r.id}
+              r={r}
+              esNuevo={newIds.has(r.id)}
+              esReciente={false}
+              onClick={() => setSeleccionado(r)}
+            />
+          ))}
+        </AnimatePresence>
+      </ul>
 
-      {/* Modal — solo se renderiza si hay un reporte seleccionado */}
+      {/* ── Sección "Recientes" ── */}
+      <SectionLabel>Recientes</SectionLabel>
+      <ul className="space-y-1.5">
+        {recientesVisibles.length === 0 && (
+          <li className="text-xs text-[var(--text-tertiary)] text-center py-4">
+            Sin reportes recientes
+          </li>
+        )}
+        <AnimatePresence initial={false}>
+          {recientesVisibles.map((r) => (
+            <ReporteCard
+              key={r.id}
+              r={r}
+              esNuevo={newRecentIds.has(r.id)}
+              esReciente={true}
+              onClick={() => setSeleccionado(r)}
+            />
+          ))}
+        </AnimatePresence>
+        {hayMas && (
+          <li className="pt-1">
+            <p className="text-[11px] text-[var(--text-tertiary)] text-center font-mono">
+              + {adaptadosRecientes.length - MAX_RECIENTES} más — ver en{" "}
+              <span className="text-[var(--accent)] font-bold cursor-pointer hover:underline">
+                Reportes
+              </span>
+            </p>
+          </li>
+        )}
+      </ul>
+
       {seleccionado && (
-        <ReporteModal reporte={seleccionado} onClose={() => setSeleccionado(null)} />
+        <ReporteModal
+          reporte={seleccionado}
+          onClose={() => setSeleccionado(null)}
+        />
       )}
     </>
   );

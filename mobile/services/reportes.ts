@@ -7,6 +7,8 @@ export type TipoReporte =
   | "semaforo_danado"
   | "otro";
 
+export type EstadoReporte = "pendiente" | "confirmado" | "inactivo";
+
 export interface Reporte {
   id: number;
   usuario_id: string;
@@ -17,7 +19,16 @@ export interface Reporte {
   longitud: number;
   severidad: number;
   validaciones: number;
+  estado: EstadoReporte;
+  activo: boolean;
+  reporte_padre_id: number | null;
   created_at: string;
+}
+
+export interface VigenciaResponse {
+  reporte_id: number;
+  estado: EstadoReporte;
+  activo: boolean;
 }
 
 export interface CrearReportePayload {
@@ -95,6 +106,18 @@ export async function listarMisReportes(
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   return fetchJson<Reporte[]>(`/reportes/mios?${qs.toString()}`, {
     method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function responderVigencia(
+  reporteId: number,
+  sigue: boolean,
+  accessToken: string,
+): Promise<VigenciaResponse> {
+  return fetchJson<VigenciaResponse>(`/reportes/${reporteId}/vigencia`, {
+    method: "POST",
+    body: JSON.stringify({ sigue }),
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }

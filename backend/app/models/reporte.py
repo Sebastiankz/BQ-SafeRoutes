@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from ..database import Base
@@ -16,4 +16,10 @@ class Reporte(Base):
     ubicacion   = Column(Geometry("POINT", srid=4326), nullable=False)
     severidad   = Column(Integer, nullable=False)
     validaciones = Column(Integer, default=0)
+    activo       = Column(Boolean, default=False, nullable=False)
+    estado       = Column(String(20), default="pendiente", nullable=False)
+    reporte_padre_id = Column(Integer, ForeignKey("reportes.id", ondelete="SET NULL"), nullable=True)
+    confirmado_at = Column(DateTime(timezone=True), nullable=True)
+    inactivado_at = Column(DateTime(timezone=True), nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    direccion   = Column(Text, nullable=True) 
