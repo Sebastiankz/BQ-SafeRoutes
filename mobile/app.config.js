@@ -9,7 +9,7 @@ export default {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#0F766E",
     },
     ios: {
       supportsTablet: true,
@@ -28,7 +28,7 @@ export default {
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#0F766E",
       },
       usesCleartextTraffic: true,
       ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim()
