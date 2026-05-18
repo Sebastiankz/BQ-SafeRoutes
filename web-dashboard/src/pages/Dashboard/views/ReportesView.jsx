@@ -1,5 +1,5 @@
 // src/pages/Dashboard/views/ReportesView.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -11,6 +11,7 @@ import {
 import { motion } from "framer-motion";
 import { getReportes, cambiarEstadoReporte } from "../../../api/reportes";
 import { supabase } from "../../../lib/supabase";
+import { reverseGeocode } from "../../../lib/geocode";
 import { useAuth } from "../../../context/AuthContext";
 import SeverityBadge from "../../../components/ui/SeverityBadge";
 import StatusDot from "../../../components/ui/StatusDot";
@@ -76,7 +77,12 @@ function COLUMNS(isAdmin) {
     { key: "created_at", label: "Fecha", sortable: true, width: "w-[140px]" },
     { key: "direccion", label: "Dirección", sortable: false },
     { key: "tipo", label: "Tipo", sortable: true, width: "w-[110px]" },
-    { key: "severidad", label: "Severidad", sortable: true, width: "w-[130px]" },
+    {
+      key: "severidad",
+      label: "Severidad",
+      sortable: true,
+      width: "w-[130px]",
+    },
     { key: "estado", label: "Estado", sortable: true, width: "w-[120px]" },
     ...(isAdmin
       ? [{ key: "acciones", label: "", sortable: false, width: "w-[110px]" }]
@@ -94,6 +100,8 @@ export default function ReportesView() {
   const [query, setQuery] = useState("");
   const [accionLoading, setAccionLoading] = useState({});
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
+  const [geoCache, setGeoCache] = useState({});
+  const geoPendingRef = useRef(new Set());
 
   const cargarReportes = useCallback((isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -119,6 +127,18 @@ export default function ReportesView() {
       supabase.removeChannel(channel);
     };
   }, [cargarReportes]);
+
+  // Geocodificar reportes sin dirección
+  useEffect(() => {
+    reportes.forEach(async (r) => {
+      if (r.direccion?.trim()) return;
+      if (r.latitud == null || r.longitud == null) return;
+      if (geoPendingRef.current.has(r.id)) return;
+      geoPendingRef.current.add(r.id);
+      const addr = await reverseGeocode(r.latitud, r.longitud);
+      if (addr) setGeoCache((prev) => ({ ...prev, [r.id]: addr }));
+    });
+  }, [reportes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const padresConfirmados = useMemo(
     () =>
@@ -150,13 +170,13 @@ export default function ReportesView() {
         (r) =>
           String(r.id).includes(q) ||
           (r.usuario_email ?? "").toLowerCase().includes(q) ||
-          (r.direccion ?? "").toLowerCase().includes(q) ||
+          (r.direccion ?? geoCache[r.id] ?? "").toLowerCase().includes(q) ||
           (TIPO_LABEL[r.tipo] ?? r.tipo ?? "").toLowerCase().includes(q),
       );
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportes, filtroEstado, query, padresConfirmados]);
+  }, [reportes, filtroEstado, query, padresConfirmados, geoCache]);
 
   const sorted = useMemo(() => {
     const arr = [...filtrados];
@@ -246,9 +266,7 @@ export default function ReportesView() {
             {ESTADOS_FILTRO.map((e) => {
               const active = filtroEstado === e;
               const tone =
-                e === "todos"
-                  ? "muted"
-                  : ESTADO_TONE[e] ?? "muted";
+                e === "todos" ? "muted" : (ESTADO_TONE[e] ?? "muted");
               return (
                 <button
                   key={e}
@@ -311,7 +329,9 @@ export default function ReportesView() {
           </div>
         )}
         {error && !loading && (
-          <p className="text-[var(--crit)] text-sm text-center py-10">{error}</p>
+          <p className="text-[var(--crit)] text-sm text-center py-10">
+            {error}
+          </p>
         )}
 
         {/* Table */}
@@ -383,7 +403,8 @@ export default function ReportesView() {
                   </tr>
                 )}
                 {sorted.map((r) => {
-                  const sevLabel = SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
+                  const sevLabel =
+                    SEVERIDAD_LABEL[r.severidad] ?? String(r.severidad);
                   const tipoLabel = TIPO_LABEL[r.tipo] ?? r.tipo;
                   const estadoDisplay = estadoDisplayDe(r);
                   const isBusy = !!accionLoading[r.id];
@@ -421,7 +442,9 @@ export default function ReportesView() {
                       </td>
                       <td className="px-4 py-3 border-b border-[var(--border)]/60 max-w-xs">
                         <span className="text-xs text-[var(--text-primary)] truncate block">
-                          {r.direccion ?? "Sin dirección"}
+                          {r.direccion?.trim() ||
+                            geoCache[r.id] ||
+                            "Sin dirección"}
                         </span>
                       </td>
                       <td className="px-4 py-3 border-b border-[var(--border)]/60">
@@ -445,7 +468,9 @@ export default function ReportesView() {
                             {estadoDisplay === "pendiente" && (
                               <button
                                 disabled={isBusy}
-                                onClick={() => handleCambioEstado(r, "confirmado")}
+                                onClick={() =>
+                                  handleCambioEstado(r, "confirmado")
+                                }
                                 className="
                                   inline-flex items-center gap-1 px-2 h-7 rounded-md
                                   text-[11px] font-bold text-[var(--ok)]
@@ -465,7 +490,9 @@ export default function ReportesView() {
                             {estadoDisplay === "confirmado" && (
                               <button
                                 disabled={isBusy}
-                                onClick={() => handleCambioEstado(r, "inactivo")}
+                                onClick={() =>
+                                  handleCambioEstado(r, "inactivo")
+                                }
                                 className="
                                   inline-flex items-center gap-1 px-2 h-7 rounded-md
                                   text-[11px] font-bold text-[var(--crit)]
