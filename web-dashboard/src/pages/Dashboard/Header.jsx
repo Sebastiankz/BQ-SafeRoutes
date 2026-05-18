@@ -1,4 +1,4 @@
-import { Moon, Sun, ShieldAlert } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import PillSelect from "../../components/ui/PillSelect";
 import StatusDot from "../../components/ui/StatusDot";
 
@@ -54,15 +54,12 @@ export default function Header({
     >
       {/* Brand */}
       <div className="flex items-center gap-3 min-w-0">
-        <div
-          className="
-            w-9 h-9 rounded-xl bg-[var(--accent)]
-            flex items-center justify-center
-            shadow-[var(--shadow-glow)] shrink-0
-          "
-        >
-          <ShieldAlert size={18} strokeWidth={2.2} className="text-white" />
-        </div>
+        <img
+          src="/logo.png"
+          alt="Monitor Vial"
+          draggable={false}
+          className="w-9 h-9 object-contain shrink-0 invert dark:invert-0 select-none"
+        />
         <div className="min-w-0 leading-tight">
           <h1 className="text-[15px] font-bold text-[var(--text-primary)] font-display tracking-tight">
             Monitor Vial
