@@ -77,6 +77,22 @@ export async function iniciarSesionBackend(
   });
 }
 
+export async function iniciarSesionConGoogleBackend(
+  idToken: string,
+  accessToken: string | null = null,
+  sessionMode: SessionMode = "body",
+): Promise<AuthResponse> {
+  return fetchJson<AuthResponse>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({
+      id_token: idToken,
+      access_token: accessToken,
+      session_mode: sessionMode,
+    }),
+  });
+}
+
+
 export async function registrarBackend(
   email: string,
   password: string,
@@ -126,8 +142,8 @@ export async function cerrarSesionBackend(
     method: "POST",
     headers: accessToken
       ? {
-          Authorization: `Bearer ${accessToken}`,
-        }
+        Authorization: `Bearer ${accessToken}`,
+      }
       : undefined,
     body: JSON.stringify({ session_mode: sessionMode }),
   });

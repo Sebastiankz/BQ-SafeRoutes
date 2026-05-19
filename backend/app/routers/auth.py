@@ -11,6 +11,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..schemas.auth import (
     AuthResponse,
+    GoogleLoginIn,
     LoginIn,
     LogoutIn,
     LogoutOut,
@@ -98,6 +99,20 @@ def login(payload: LoginIn, response: Response):
 
     return _to_auth_response(session, payload.session_mode)
 
+@router.post("/google", response_model=AuthResponse)
+def login_con_google(payload: GoogleLoginIn, response: Response):
+    try:
+        session = auth_service.login_con_google(
+            payload.id_token.strip(),
+            payload.access_token.strip() if payload.access_token else None,
+        )
+    except auth_service.AuthServiceError as exc:
+        _raise_service_error(exc)
+
+    if payload.session_mode == "cookie":
+        _set_refresh_cookie(response, session.refresh_token)
+
+    return _to_auth_response(session, payload.session_mode)
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterIn, response: Response):
