@@ -18,11 +18,11 @@ import StatusDot from "../../../components/ui/StatusDot";
 
 // ─── Maps ─────────────────────────────────────────────────────
 const SEVERIDAD_LABEL = {
-  1: "Leve",
-  2: "Solo Daños",
-  3: "Riesgo Alto",
-  4: "Heridos",
-  5: "Muertos",
+  1: "Baja",
+  2: "Media",
+  3: "Alta",
+  4: "Alta",
+  5: "Crítica",
 };
 
 const TIPO_LABEL = {
@@ -274,10 +274,9 @@ export default function ReportesView() {
                   className={`
                     inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-semibold
                     border transition-all cursor-pointer
-                    ${
-                      active
-                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--shadow-glow)]"
-                        : "bg-transparent text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                    ${active
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--shadow-glow)]"
+                      : "bg-transparent text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                     }
                   `}
                 >
@@ -290,9 +289,8 @@ export default function ReportesView() {
                   )}
                   {e[0].toUpperCase() + e.slice(1)}
                   <span
-                    className={`font-mono text-[10px] tabular ${
-                      active ? "text-white/80" : "text-[var(--text-tertiary)]"
-                    }`}
+                    className={`font-mono text-[10px] tabular ${active ? "text-white/80" : "text-[var(--text-tertiary)]"
+                      }`}
                   >
                     {counts[e] ?? 0}
                   </span>

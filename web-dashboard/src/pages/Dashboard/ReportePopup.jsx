@@ -54,11 +54,11 @@ const TIPO_ICON_BG = {
 };
 
 const SEV_LABEL = {
-  1: "Leve",
-  2: "Solo daños",
-  3: "Riesgo alto",
-  4: "Heridos",
-  5: "Muertos",
+  1: "Baja",
+  2: "Media",
+  3: "Alta",
+  4: "Alta",
+  5: "Crítica",
 };
 
 // Pill de severidad
