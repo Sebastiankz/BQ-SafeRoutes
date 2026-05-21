@@ -239,7 +239,11 @@ export default function MapaGoogleMaps({
     setHotspots([]); // limpia puntos anteriores antes de que llegue la nueva respuesta
 
     const qs = buildHotspotsQuery(año, mes);
-    apiFetch(`/hotspots/?${qs}`)
+    apiFetch(`/api/hotspots/?${qs}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Error ${r.status} al cargar hotspots`);
+        return r.json();
+      })
       .then((data) => {
         if (!cancelled) setHotspots(data);
       })

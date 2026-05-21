@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAuth, isAdminEmail } from "../../context/AuthContext";
+import { apiFetch } from "../../api/client";
 
 const ROL_OPTIONS = [
   { value: "policia", label: "Policía", Icon: Shield },
@@ -48,7 +49,7 @@ export default function LoginModal({ onClose }) {
       try {
         const [todosRep, usuariosRes] = await Promise.allSettled([
           getReportes(200, 0, "todos"),
-          fetch("/api/auth/users/count").then((r) =>
+          apiFetch("/api/auth/users/count").then((r) =>
             r.ok ? r.json() : { count: 0 },
           ),
         ]);
