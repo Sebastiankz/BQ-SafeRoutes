@@ -1,7 +1,10 @@
 // src/lib/geocode.js
 //
-// Reverse geocoding via Nominatim (OpenStreetMap) — sin API key, gratis.
+// Reverse geocoding via backend proxy (/api/geocode/reverse).
+// El backend llama a Nominatim para evitar el CORS de OpenStreetMap.
 // Incluye caché en memoria para evitar llamadas duplicadas.
+
+import { apiFetch } from "../api/client";
 
 const cache = new Map(); // "lat,lng" → address string
 
@@ -18,13 +21,9 @@ export async function reverseGeocode(lat, lng) {
   if (cache.has(key)) return cache.get(key);
 
   try {
-    const url =
-      `https://nominatim.openstreetmap.org/reverse` +
-      `?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=es`;
-
-    const res = await fetch(url, {
-      headers: { "User-Agent": "BQ-SafeRoutes/1.0" },
-    });
+    const res = await apiFetch(
+      `/api/geocode/reverse?lat=${lat}&lng=${lng}`,
+    );
 
     if (!res.ok) {
       cache.set(key, null);
@@ -32,19 +31,7 @@ export async function reverseGeocode(lat, lng) {
     }
 
     const data = await res.json();
-    const a = data.address ?? {};
-
-    // Construir dirección corta: calle [número], barrio, ciudad
-    const parts = [
-      a.road ?? a.pedestrian ?? a.path ?? a.highway,
-      a.house_number,
-      a.suburb ?? a.neighbourhood ?? a.quarter ?? a.city_district,
-      a.city ?? a.town ?? a.village ?? a.county,
-    ].filter(Boolean);
-
-    const address = parts.length
-      ? parts.join(", ")
-      : (data.display_name ?? null);
+    const address = data.address ?? null;
     cache.set(key, address);
     return address;
   } catch {
