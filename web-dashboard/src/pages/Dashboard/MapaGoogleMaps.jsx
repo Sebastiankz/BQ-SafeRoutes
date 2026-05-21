@@ -175,6 +175,7 @@ export default function MapaGoogleMaps({
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY ?? "",
     libraries: LIBRARIES,
+    version: "3.64",
   });
 
   const [hotspots, setHotspots] = useState([]);
@@ -287,19 +288,24 @@ export default function MapaGoogleMaps({
     if (!mostrarHeatmap || heatmapData.length === 0) return;
 
     // Crear nueva capa con los datos actuales
-    heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer(
-      {
-        data: heatmapData,
-        map: mapRef.current,
-        gradient: HEATMAP_GRADIENT,
-        opacity: HEATMAP_OPACITY,
-        radius: HEATMAP_RADIUS,
-        maxIntensity: Math.max(
-          ...hotspots.map((h) => h.num_incidentes ?? 1),
-          1,
-        ),
-      },
-    );
+    try {
+      heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer(
+        {
+          data: heatmapData,
+          map: mapRef.current,
+          gradient: HEATMAP_GRADIENT,
+          opacity: HEATMAP_OPACITY,
+          radius: HEATMAP_RADIUS,
+          maxIntensity: Math.max(
+            ...hotspots.map((h) => h.num_incidentes ?? 1),
+            1,
+          ),
+        },
+      );
+    } catch (e) {
+      console.warn("HeatmapLayer no disponible en esta versión de Google Maps:", e);
+      heatmapLayerRef.current = null;
+    }
 
     return () => {
       if (heatmapLayerRef.current) {
