@@ -1,6 +1,9 @@
 let getAccessToken = () => null;
 let refreshAccessToken = async () => null;
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+const toAbsolute = (path) => API_BASE ? path.replace(/^\/api/, API_BASE) : path;
+
 export function configureApiAuth({ accessTokenGetter, refreshTokenFn }) {
   getAccessToken =
     typeof accessTokenGetter === "function" ? accessTokenGetter : () => null;
@@ -15,7 +18,7 @@ export async function apiFetch(path, init = {}, retryOnAuthError = true) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(toAbsolute(path), {
     ...init,
     credentials: "include",
     headers,
@@ -33,7 +36,7 @@ export async function apiFetch(path, init = {}, retryOnAuthError = true) {
   const retryHeaders = new Headers(init.headers || {});
   retryHeaders.set("Authorization", `Bearer ${refreshed}`);
 
-  return fetch(path, {
+  return fetch(toAbsolute(path), {
     ...init,
     credentials: "include",
     headers: retryHeaders,
