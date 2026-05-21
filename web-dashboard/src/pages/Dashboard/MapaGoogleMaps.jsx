@@ -1,40 +1,24 @@
-// src/pages/Dashboard/MapaGoogleMaps.jsx
-//
-// Reemplaza MapaLeaflet.jsx.
-// - Usa @react-google-maps/api (Google Maps JS API) en vez de Leaflet.
-// - Consume GET /api/hotspots/ (mismos endpoints que la app mobile).
-// - El gradiente, opacidad y pesos del heatmap son idénticos a MapScreen.tsx.
-// - Props: { año, mes } — misma interfaz que tenía MapaLeaflet, sin cambios en Dashboard.jsx.
-// - NO modifica la lógica de filtrado de useDashboardData.
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { Layers } from "lucide-react";
 import ReportePopup from "./ReportePopup";
+import { apiFetch } from "../../api/client";
 
-// ── Constantes ────────────────────────────────────────────────────────────────
 
 const BARRANQUILLA_CENTER = { lat: 10.9685, lng: -74.7889 };
 const DEFAULT_ZOOM = 13;
 
-// Gradiente basado en HEATMAP_GRADIENT de MapScreen.tsx.
-// El primer color DEBE ser transparente en Google Maps JS API: sin él, el heatmap
-// pinta de azul sólido toda el área visible aunque no haya datos.
 const HEATMAP_GRADIENT = [
-  "rgba(0, 0, 0, 0)", // 0 %  — sin datos → transparente (muestra el mapa)
-  "#1a73e8", // 5 %  — azul Google
-  "#43e97b", // 25 % — verde
-  "#f6d365", // 50 % — amarillo
-  "#f08080", // 75 % — salmón
-  "#E53E3E", // 100 % — rojo (máxima densidad)
+  "rgba(0, 0, 0, 0)",
+  "#1a73e8",
+  "#43e97b",
+  "#f6d365",
+  "#f08080",
+  "#E53E3E",
 ];
 
-// Radio en píxeles pantalla. En mobile se usa 70 en unidades de densidad nativa;
-// 35 px en web es equivalente visual a zoom 13.
 const HEATMAP_RADIUS = 35;
-const HEATMAP_OPACITY = 0.85; // idéntico a mobile
-
-// Libraries array fuera del componente para evitar re-renders del loader.
+const HEATMAP_OPACITY = 0.85;
 const LIBRARIES = ["visualization"];
 
 const MAP_OPTIONS = {
@@ -72,13 +56,6 @@ const SEVERIDAD_LABEL = {
   5: "Muertos",
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Lucide icon paths (24×24) scaled to 18×18 and centered at (22,20) in the
- * 44×54 marker SVG. transform="translate(13,11) scale(0.75)" achieves that.
- * All icons use stroke="white" fill="none" — same visual language as the UI.
- */
 function buildIconGroup(tipo) {
   const g = (inner) =>
     `<g transform="translate(13,11) scale(0.75)" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</g>`;
@@ -87,26 +64,26 @@ function buildIconGroup(tipo) {
     case "accidente": // Car
       return g(
         '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>' +
-          '<circle cx="7" cy="17" r="2"/>' +
-          '<path d="M9 17h6"/>' +
-          '<circle cx="17" cy="17" r="2"/>',
+        '<circle cx="7" cy="17" r="2"/>' +
+        '<path d="M9 17h6"/>' +
+        '<circle cx="17" cy="17" r="2"/>',
       );
     case "hueco": // Construction
       return g(
         '<rect x="2" y="6" width="20" height="8" rx="1"/>' +
-          '<path d="M17 14v7"/>' +
-          '<path d="M7 14v7"/>' +
-          '<path d="M17 3v3"/>' +
-          '<path d="M7 3v3"/>' +
-          '<path d="M10 14 2.3 6.3"/>' +
-          '<path d="m14 6 7.7 7.7"/>' +
-          '<path d="m8 6 8 8"/>',
+        '<path d="M17 14v7"/>' +
+        '<path d="M7 14v7"/>' +
+        '<path d="M17 3v3"/>' +
+        '<path d="M7 3v3"/>' +
+        '<path d="M10 14 2.3 6.3"/>' +
+        '<path d="m14 6 7.7 7.7"/>' +
+        '<path d="m8 6 8 8"/>',
       );
     case "arroyo": // Waves
       return g(
         '<path d="M2 12q2.5 2 5 0t5 0 5 0 5 0"/>' +
-          '<path d="M2 19q2.5 2 5 0t5 0 5 0 5 0"/>' +
-          '<path d="M2 5q2.5 2 5 0t5 0 5 0 5 0"/>',
+        '<path d="M2 19q2.5 2 5 0t5 0 5 0 5 0"/>' +
+        '<path d="M2 5q2.5 2 5 0t5 0 5 0 5 0"/>',
       );
     case "semaforo_danado": // Zap
       return g(
@@ -115,8 +92,8 @@ function buildIconGroup(tipo) {
     default: // CircleAlert (otro)
       return g(
         '<circle cx="12" cy="12" r="10"/>' +
-          '<line x1="12" x2="12" y1="8" y2="12"/>' +
-          '<line x1="12" x2="12.01" y1="16" y2="16"/>',
+        '<line x1="12" x2="12" y1="8" y2="12"/>' +
+        '<line x1="12" x2="12.01" y1="16" y2="16"/>',
       );
   }
 }
@@ -262,11 +239,7 @@ export default function MapaGoogleMaps({
     setHotspots([]); // limpia puntos anteriores antes de que llegue la nueva respuesta
 
     const qs = buildHotspotsQuery(año, mes);
-    fetch(`/api/hotspots/?${qs}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Error ${r.status} al cargar hotspots`);
-        return r.json();
-      })
+    apiFetch(`/hotspots/?${qs}`)
       .then((data) => {
         if (!cancelled) setHotspots(data);
       })
@@ -394,11 +367,6 @@ export default function MapaGoogleMaps({
   }, []);
 
   // ── Render ──────────────────────────────────────────────────────────────────
-  //
-  // IMPORTANTE: El componente NO tiene un div wrapper con padding/altura fija.
-  // Ocupa el 100% de su contenedor (que en MapaView.jsx es un absolute-inset).
-  // Los controles flotan sobre el mapa mediante position:absolute para que
-  // el canvas de Google Maps siempre reciba una altura real en píxeles.
 
   // Error fatal: Google Maps no pudo cargarse en absoluto.
   if (loadError) {
