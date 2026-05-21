@@ -5,8 +5,10 @@ function unwrapDetail(detail) {
   return JSON.stringify(detail);
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+
 async function fetchAuth(path, init = {}) {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(API_BASE ? `${API_BASE}${path}` : `/api${path}`, {
     credentials: "include",
     ...init,
     headers: {
