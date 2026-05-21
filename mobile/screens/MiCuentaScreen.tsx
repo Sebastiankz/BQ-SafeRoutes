@@ -17,7 +17,14 @@ import { useAuth } from "../context/AuthContext";
 import { colors, iosTitleFont, radii, shadow, spacing } from "../theme/tokens";
 
 export default function MiCuentaScreen() {
-  const { usuario, iniciarSesion, registrar, cerrarSesion } = useAuth();
+  const {
+    usuario,
+    iniciarSesion,
+    iniciarSesionConGoogle,
+    googleSignInAvailable,
+    registrar,
+    cerrarSesion,
+  } = useAuth();
 
   const [modoRegistro, setModoRegistro] = useState(false);
   const [email, setEmail] = useState("");
@@ -49,6 +56,22 @@ export default function MiCuentaScreen() {
       setCargando(false);
     }
   }
+
+  async function entrarConGoogle() {
+    setError(null);
+    setCargando(true);
+    try {
+      await iniciarSesionConGoogle();
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : String(e);
+      if (!mensaje.toLowerCase().includes("cancelado")) {
+        setError(mensaje);
+      }
+    } finally {
+      setCargando(false);
+    }
+  }
+
 
   const formularioValido =
     !!email.trim() && !!password.trim() && (!modoRegistro || !!nombre.trim());
@@ -236,6 +259,26 @@ export default function MiCuentaScreen() {
               </>
             )}
           </Pressable>
+
+          {googleSignInAvailable && (
+            <>
+              <View style={styles.separador}>
+                <View style={styles.separadorLinea} />
+                <Text style={styles.separadorTxt}>o</Text>
+                <View style={styles.separadorLinea} />
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={cargando}
+                style={[styles.btn, styles.btnGoogle, cargando && styles.btnDisabled]}
+                onPress={() => void entrarConGoogle()}
+              >
+                <MaterialCommunityIcons color="#EA4335" name="google" size={18} />
+                <Text style={styles.btnGoogleTxt}>Continuar con Google</Text>
+              </Pressable>
+            </>
+          )}
 
           <Pressable
             accessibilityRole="button"
@@ -434,4 +477,34 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 4,
   },
+  btnGoogle: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  btnGoogleTxt: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  separador: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.md,
+    marginBottom: 4,
+    gap: spacing.sm,
+  },
+  separadorLinea: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  separadorTxt: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
 });

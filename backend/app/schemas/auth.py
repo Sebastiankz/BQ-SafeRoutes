@@ -44,3 +44,8 @@ class LogoutIn(BaseModel):
 
 class LogoutOut(BaseModel):
     ok: bool = True
+
+class GoogleLoginIn(BaseModel):
+    id_token: str = Field(min_length=10)  # JWT firmado por Google
+    access_token: Optional[str] = None  # OAuth access token; permite a Supabase verificar vía UserInfo y omitir el chequeo de nonce
+    session_mode: SessionMode = "body"

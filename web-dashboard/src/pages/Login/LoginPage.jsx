@@ -157,20 +157,18 @@ export default function LoginModal({ onClose }) {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
+              <img
+                src="/logo.png"
+                alt="Monitor Vial"
+                draggable={false}
                 style={{
                   width: 30,
                   height: 30,
-                  borderRadius: 8,
-                  background: "#1E3A8A",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  objectFit: "contain",
+                  userSelect: "none",
                   flexShrink: 0,
                 }}
-              >
-                <Shield size={15} strokeWidth={2.3} color="#93C5FD" />
-              </div>
+              />
               <span
                 style={{
                   fontSize: 13,

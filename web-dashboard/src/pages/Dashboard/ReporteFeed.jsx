@@ -64,7 +64,7 @@ const TIPO_TONE = {
 };
 
 const SEVERIDAD_PRIORIDAD = {
-  1: "Media",
+  1: "Baja",
   2: "Media",
   3: "Alta",
   4: "Alta",
@@ -366,10 +366,9 @@ function ReporteCard({ r, esNuevo, esReciente = false, onClick }) {
           group w-full text-left p-3 rounded-xl
           transition-all duration-200 cursor-pointer
           border
-          ${
-            esNuevo
-              ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
-              : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
+          ${esNuevo
+            ? "animate-slide-in-top bg-[var(--ok-tint)] border-[var(--ok)]/30 hover:border-[var(--ok)]/50"
+            : "bg-transparent border-transparent hover:bg-[var(--surface-muted)] hover:border-[var(--border)]"
           }
         `}
       >

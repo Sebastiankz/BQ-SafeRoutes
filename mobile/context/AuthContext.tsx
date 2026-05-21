@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import {
   createContext,
   useCallback,
@@ -9,14 +10,29 @@ import {
   type PropsWithChildren,
 } from "react";
 
+// Expo Go no incluye el módulo nativo de Google Sign-In:
+// detectamos el runtime para ocultar el botón y evitar crashes.
+const googleSignInAvailable =
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+
+// require condicional: importarlo estáticamente revienta en Expo Go porque
+// el TurboModule RNGoogleSignin no existe en su binario.
+type GoogleSignInSdk = typeof import("@react-native-google-signin/google-signin");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const googleSdk: GoogleSignInSdk | null = googleSignInAvailable
+  ? require("@react-native-google-signin/google-signin")
+  : null;
+
 import {
   cerrarSesionBackend,
   iniciarSesionBackend,
+  iniciarSesionConGoogleBackend,
   obtenerPerfilBackend,
   refrescarSesionBackend,
   registrarBackend,
   type UsuarioSesion,
 } from "../services/auth";
+
 
 export type { UsuarioSesion } from "../services/auth";
 
@@ -34,13 +50,16 @@ type AuthState = {
   token: string | null;
   usuario: UsuarioSesion | null;
   hydrating: boolean;
+  googleSignInAvailable: boolean;
 };
 
 type AuthActions = {
   iniciarSesion: (email: string, password: string) => Promise<void>;
   registrar: (email: string, password: string, nombre: string) => Promise<void>;
+  iniciarSesionConGoogle: () => Promise<void>;
   cerrarSesion: () => Promise<void>;
 };
+
 
 const AuthContext = createContext<(AuthState & AuthActions) | null>(null);
 
@@ -136,10 +155,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 refreshToken: refreshed.refresh_token ?? storedRefresh,
                 usuario: refreshed.usuario ??
                   storedUser ?? {
-                    id: "",
-                    email: "",
-                    nombre: null,
-                  },
+                  id: "",
+                  email: "",
+                  nombre: null,
+                },
               };
               if (
                 !sesionRefrescada.usuario.id ||
@@ -173,6 +192,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, [aplicarSesion]);
 
+  useEffect(() => {
+    if (!googleSdk) return;
+    googleSdk.GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    });
+  }, []);
+
+
   const iniciarSesion = useCallback(
     async (email: string, password: string) => {
       const data = await iniciarSesionBackend(email, password, "body");
@@ -201,15 +229,64 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [aplicarSesion],
   );
 
+  const iniciarSesionConGoogle = useCallback(async () => {
+    if (!googleSdk) {
+      throw new Error(
+        "Google Sign-In no está disponible en Expo Go. Usa el dev build o el simulador.",
+      );
+    }
+    const { GoogleSignin, isErrorWithCode, statusCodes } = googleSdk;
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+    let idToken: string | null = null;
+    try {
+      const response = await GoogleSignin.signIn();
+      if (response.type === "success") {
+        idToken = response.data.idToken;
+      } else if (response.type === "cancelled") {
+        throw new Error("Inicio de sesión con Google cancelado");
+      }
+    } catch (err) {
+      if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new Error("Inicio de sesión con Google cancelado");
+      }
+      throw err;
+    }
+
+    if (!idToken) {
+      throw new Error("No se obtuvo un id_token de Google");
+    }
+
+    const { accessToken } = await GoogleSignin.getTokens();
+
+    const data = await iniciarSesionConGoogleBackend(idToken, accessToken, "body");
+    const sesion: SesionPersistida = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      usuario: data.usuario,
+    };
+    await guardarSesion(sesion);
+    aplicarSesion(sesion);
+  }, [aplicarSesion]);
+
+
   const cerrarSesion = useCallback(async () => {
     try {
       await cerrarSesionBackend(token, "body");
     } catch {
       // Ignoramos fallos remotos para no dejar sesión local colgada.
     }
+    if (googleSdk) {
+      try {
+        await googleSdk.GoogleSignin.signOut();
+      } catch {
+        // Si el usuario no se había logueado con Google, esto puede fallar — ignoramos.
+      }
+    }
     await limpiarSesion();
     aplicarSesion(null);
   }, [token, aplicarSesion]);
+
 
   const value = useMemo(
     () =>
@@ -217,12 +294,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         token,
         usuario,
         hydrating,
+        googleSignInAvailable,
         iniciarSesion,
         registrar,
+        iniciarSesionConGoogle,
         cerrarSesion,
       }) satisfies AuthState & AuthActions,
-    [token, usuario, hydrating, iniciarSesion, registrar, cerrarSesion],
+    [token, usuario, hydrating, iniciarSesion, registrar, iniciarSesionConGoogle, cerrarSesion],
   );
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -14,7 +14,8 @@ from .routers import reportes_router, hotspots_router, incidentes_router, auth_r
 
 settings = get_settings()
 
-Base.metadata.create_all(bind=engine)
+if settings.ENVIRONMENT == "development":
+    Base.metadata.create_all(bind=engine)
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT])
 
