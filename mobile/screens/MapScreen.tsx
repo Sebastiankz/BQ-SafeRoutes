@@ -53,9 +53,14 @@ const BARRANQUILLA = {
   longitudeDelta: 0.08,
 };
 
-const tieneClaveGoogleMaps = Boolean(
-  process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim(),
-);
+const GOOGLE_MAPS_API_KEY =
+  Platform.select({
+    ios: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS,
+    android: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID,
+    default: "",
+  }) ?? "";
+
+const tieneClaveGoogleMaps = Boolean(GOOGLE_MAPS_API_KEY.trim());
 
 type HudState = {
   iconName: "fire" | "shield-check" | "layers-triple-outline";
@@ -819,7 +824,7 @@ export default function MapScreen() {
 
   const handleSeleccionarDestino = useCallback(
     async (lugar: LugarSugerido) => {
-      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+      const apiKey = GOOGLE_MAPS_API_KEY;
       const origen = coordsUsuarioRef.current ?? {
         latitude: region.latitude,
         longitude: region.longitude,
@@ -898,8 +903,9 @@ export default function MapScreen() {
           </Text>
           <Text style={styles.listaSinMapaTxt}>
             En <Text style={styles.mono}>mobile/.env</Text> define{" "}
-            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_MAPS_KEY</Text> con una
-            clave de Google Cloud con{" "}
+            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS</Text> y{" "}
+            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID</Text>{" "}
+            con claves de Google Cloud con{" "}
             <Text style={styles.bold}>Maps SDK for Android</Text> e{" "}
             <Text style={styles.bold}>Maps SDK for iOS</Text> habilitados para
             este proyecto. Reinicia Expo con{" "}
@@ -1090,7 +1096,7 @@ export default function MapScreen() {
       )}
 
       <BuscarDireccionModal
-        apiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? ""}
+        apiKey={GOOGLE_MAPS_API_KEY}
         userLocation={coordsUsuario ?? undefined}
         onClose={() => setModalBusquedaVisible(false)}
         onSelectLugar={handleSeleccionarDestino}

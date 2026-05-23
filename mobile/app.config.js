@@ -14,12 +14,12 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.bqsaferoutes.app",
-      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim()
+      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS?.trim()
         ? {
-            config: {
-              googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY.trim(),
-            },
-          }
+          config: {
+            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS.trim(),
+          },
+        }
         : {}),
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
@@ -33,14 +33,14 @@ export default {
         backgroundColor: "#0F766E",
       },
       usesCleartextTraffic: true,
-      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY?.trim()
+      ...(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID?.trim()
         ? {
-            config: {
-              googleMaps: {
-                apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY,
-              },
+          config: {
+            googleMaps: {
+              apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID,
             },
-          }
+          },
+        }
         : {}),
       permissions: [
         "android.permission.ACCESS_FINE_LOCATION",
@@ -50,9 +50,9 @@ export default {
     plugins: [
       process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
         ? [
-            "@react-native-google-signin/google-signin",
-            { iosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME },
-          ]
+          "@react-native-google-signin/google-signin",
+          { iosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME },
+        ]
         : "@react-native-google-signin/google-signin",
       [
         "expo-build-properties",
