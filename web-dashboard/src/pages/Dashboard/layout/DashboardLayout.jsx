@@ -1,14 +1,19 @@
 // src/pages/Dashboard/layout/DashboardLayout.jsx
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "../Header";
 import Sidebar from "./Sidebar";
 
 export default function DashboardLayout({
-  año, setAño,
-  gravedad, setGravedad,
-  mes, setMes,
-  isDark, setIsDark,
-  seccion, setSeccion,
+  año,
+  setAño,
+  gravedad,
+  setGravedad,
+  mes,
+  setMes,
+  isDark,
+  setIsDark,
+  seccion,
+  setSeccion,
   reportesActivos = 0,
   children,
 }) {
@@ -21,23 +26,32 @@ export default function DashboardLayout({
     root.style.colorScheme = isDark ? "dark" : "light";
   }, [isDark]);
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <div
       className="min-h-screen lg:h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       <Header
-        año={año} setAño={setAño}
-        gravedad={gravedad} setGravedad={setGravedad}
-        mes={mes} setMes={setMes}
-        isDark={isDark} setIsDark={setIsDark}
+        año={año}
+        setAño={setAño}
+        gravedad={gravedad}
+        setGravedad={setGravedad}
+        mes={mes}
+        setMes={setMes}
+        isDark={isDark}
+        setIsDark={setIsDark}
         mostrarGravedad={seccion !== "mapa"}
+        onMenuToggle={() => setMobileNavOpen((o) => !o)}
       />
       <div className="flex flex-1 lg:overflow-hidden">
         <Sidebar
           seccion={seccion}
           setSeccion={setSeccion}
           reportesActivos={reportesActivos}
+          mobileNavOpen={mobileNavOpen}
+          onMobileNavClose={() => setMobileNavOpen(false)}
         />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--bg-primary)]">
           {children}

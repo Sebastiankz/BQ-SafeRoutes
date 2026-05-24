@@ -1,5 +1,6 @@
 // src/pages/Dashboard/layout/Sidebar.jsx
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   MapPin,
   BarChart3,
@@ -8,6 +9,7 @@ import {
   LogOut,
   ChevronRight,
   ChevronsRight,
+  X,
   Pin,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
@@ -201,7 +203,13 @@ function AdminArea({ isAdmin, usuario, cerrarSesion, onOpenLogin, expanded }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────
-export default function Sidebar({ seccion, setSeccion, reportesActivos = 0 }) {
+export default function Sidebar({
+  seccion,
+  setSeccion,
+  reportesActivos = 0,
+  mobileNavOpen = false,
+  onMobileNavClose,
+}) {
   const { usuario, isAdmin, cerrarSesion } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [pinned, setPinned] = useState(() => {
@@ -338,48 +346,106 @@ export default function Sidebar({ seccion, setSeccion, reportesActivos = 0 }) {
         </nav>
       </aside>
 
-      {/* Mobile tab bar — unchanged */}
-      <div className="flex lg:hidden shrink-0 bg-[var(--surface)] border-b border-[var(--border)]">
-        {NAV_ITEMS.map(({ id, label, Icon, showBadge }) => {
-          const active = seccion === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setSeccion(id)}
-              className={`
-                relative flex-1 flex flex-col items-center gap-0.5 py-2.5
-                text-[10px] font-semibold transition-colors cursor-pointer
-                ${
-                  active
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
-                }
-              `}
+      {/* ── Mobile drawer ─────────────────────────────────────────────
+          Triggered by the hamburger button in Header.
+          AnimatePresence renders the overlay + drawer only when open,
+          then animates them out on close for a smooth exit.
+      ─────────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="mob-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
+              aria-hidden
+              onClick={onMobileNavClose}
+            />
+
+            {/* Drawer panel */}
+            <motion.nav
+              key="mob-drawer"
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="
+                lg:hidden fixed left-0 top-0 bottom-0 z-50
+                w-[280px] flex flex-col
+                bg-[var(--surface)] border-r border-[var(--border)]
+                shadow-[var(--shadow-pop)]
+              "
+              aria-label="Menú de navegación"
             >
-              <Icon size={16} strokeWidth={2.2} />
-              {label}
-              {showBadge && reportesActivos > 0 && (
-                <span className="absolute top-1.5 right-1/2 translate-x-3 w-1.5 h-1.5 rounded-full bg-[var(--crit)]" />
-              )}
-              {active && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-[var(--accent)]" />
-              )}
-            </button>
-          );
-        })}
-        <button
-          onClick={() => (isAdmin ? cerrarSesion() : openLogin())}
-          className={`
-            flex flex-col items-center gap-0.5 py-2.5 px-3.5
-            text-[10px] font-semibold transition-colors cursor-pointer
-            ${isAdmin ? "text-[var(--accent)]" : "text-[var(--text-tertiary)]"}
-          `}
-          title={isAdmin ? "Cerrar sesión" : "Acceso policial"}
-        >
-          <Shield size={16} strokeWidth={2.2} />
-          {isAdmin ? "Admin" : "Policía"}
-        </button>
-      </div>
+              {/* Drawer header */}
+              <div className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src="/logo.png"
+                    alt="Monitor Vial"
+                    draggable={false}
+                    className="w-7 h-7 object-contain shrink-0 invert dark:invert-0 select-none"
+                  />
+                  <span className="font-display font-bold text-[14px] text-[var(--text-primary)] tracking-tight">
+                    Monitor Vial
+                  </span>
+                </div>
+                <button
+                  onClick={onMobileNavClose}
+                  aria-label="Cerrar menú"
+                  className="
+                    w-8 h-8 rounded-lg flex items-center justify-center
+                    text-[var(--text-tertiary)]
+                    hover:text-[var(--text-primary)] hover:bg-[var(--surface-muted)]
+                    transition-colors cursor-pointer
+                  "
+                >
+                  <X size={16} strokeWidth={2.2} />
+                </button>
+              </div>
+
+              {/* Nav items */}
+              <div className="flex-1 px-3 py-3 space-y-1 overflow-y-auto scroll-thin">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)] font-mono px-2 mb-2">
+                  Navegación
+                </p>
+                {NAV_ITEMS.map((item) => (
+                  <NavItem
+                    key={item.id}
+                    item={item}
+                    active={seccion === item.id}
+                    onClick={() => {
+                      setSeccion(item.id);
+                      onMobileNavClose?.();
+                    }}
+                    badge={reportesActivos}
+                    expanded={true}
+                  />
+                ))}
+              </div>
+
+              {/* Admin area */}
+              <AdminArea
+                isAdmin={isAdmin}
+                usuario={usuario}
+                cerrarSesion={() => {
+                  cerrarSesion();
+                  onMobileNavClose?.();
+                }}
+                onOpenLogin={() => {
+                  openLogin();
+                  onMobileNavClose?.();
+                }}
+                expanded={true}
+              />
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </>
