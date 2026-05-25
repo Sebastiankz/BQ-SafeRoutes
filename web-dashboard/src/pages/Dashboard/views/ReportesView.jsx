@@ -234,7 +234,7 @@ export default function ReportesView() {
 
   // ─── Render ────────────────────────────────────────────────
   return (
-    <main className="flex-1 overflow-y-auto scroll-thin bg-[var(--bg-primary)] p-5 lg:p-7">
+    <main className="flex-1 overflow-y-auto scroll-thin bg-[var(--bg-primary)] p-4 sm:p-5 lg:p-7">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -8 }}
@@ -261,8 +261,8 @@ export default function ReportesView() {
 
       {/* Toolbar */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-[var(--shadow-soft)] mb-4">
-        <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-b border-[var(--border)] flex-wrap">
-          <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-b border-[var(--border)] flex-wrap gap-y-2">
+          <div className="flex items-center gap-1 flex-wrap gap-y-2">
             {ESTADOS_FILTRO.map((e) => {
               const active = filtroEstado === e;
               const tone =
@@ -274,9 +274,10 @@ export default function ReportesView() {
                   className={`
                     inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-semibold
                     border transition-all cursor-pointer
-                    ${active
-                      ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--shadow-glow)]"
-                      : "bg-transparent text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                    ${
+                      active
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--shadow-glow)]"
+                        : "bg-transparent text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                     }
                   `}
                 >
@@ -289,8 +290,9 @@ export default function ReportesView() {
                   )}
                   {e[0].toUpperCase() + e.slice(1)}
                   <span
-                    className={`font-mono text-[10px] tabular ${active ? "text-white/80" : "text-[var(--text-tertiary)]"
-                      }`}
+                    className={`font-mono text-[10px] tabular ${
+                      active ? "text-white/80" : "text-[var(--text-tertiary)]"
+                    }`}
                   >
                     {counts[e] ?? 0}
                   </span>

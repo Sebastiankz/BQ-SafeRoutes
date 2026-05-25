@@ -128,17 +128,7 @@ export default function LoginModal({ onClose }) {
         initial={{ opacity: 0, y: 14, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          width: "100%",
-          maxWidth: 760,
-          borderRadius: 16,
-          overflow: "hidden",
-          background: "#141d2e",
-          boxShadow:
-            "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
-        }}
+        className="login-modal-grid"
       >
         {/* ══ PANEL IZQUIERDO — formulario ══════════════════════════════ */}
         <div
@@ -531,6 +521,7 @@ export default function LoginModal({ onClose }) {
 
         {/* ══ PANEL DERECHO — visual ══════════════════════════════════════ */}
         <div
+          className="login-modal-right"
           style={{
             background: "#0d1420",
             borderLeft: "1px solid rgba(255,255,255,0.05)",

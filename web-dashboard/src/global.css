@@ -130,6 +130,8 @@ body,
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "ss01", "cv11";
+  /* Prevent global horizontal overflow on any viewport */
+  overflow-x: hidden;
 }
 
 /* Numbers, IDs, coordinates */
@@ -154,6 +156,31 @@ body,
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Login modal — responsive grid
+   ───────────────────────────────────────────────────────────── */
+.login-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 760px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #141d2e;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 639px) {
+  .login-modal-grid {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    border-radius: 14px;
+  }
+  .login-modal-right {
+    display: none !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────

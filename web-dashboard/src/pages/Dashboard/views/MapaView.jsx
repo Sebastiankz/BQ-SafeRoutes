@@ -12,10 +12,10 @@ export default function MapaView({
 }) {
   return (
     <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-      {/* Map column — section is the positioning context; the inner card
-          fills via absolute inset so Google Maps always sees a definite
-          pixel height regardless of flex-layout resolution timing. */}
-      <section className="relative flex-1 min-w-0 min-h-0 bg-[var(--bg-primary)] p-3 lg:p-4">
+      {/* Map column — on mobile: explicit h-[55vh] so the absolute-positioned
+          Google Maps container has a concrete pixel height to fill.
+          On desktop (lg+): flex-1 so it takes all remaining space. */}
+      <section className="relative h-[55vh] lg:flex-1 lg:h-auto shrink-0 lg:shrink min-w-0 bg-[var(--bg-primary)] p-3 lg:p-4">
         <div
           className="
             absolute top-3 right-3 bottom-3 left-3
@@ -38,6 +38,7 @@ export default function MapaView({
       <aside
         className="
           w-full lg:w-[340px] shrink-0 lg:overflow-y-auto scroll-thin
+          max-h-[45vh] overflow-y-auto lg:max-h-none
           border-t lg:border-t-0 lg:border-l border-[var(--border)]
           bg-[var(--surface)] p-4
         "
