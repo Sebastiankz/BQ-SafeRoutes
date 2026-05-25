@@ -30,12 +30,10 @@ function parseHora(horaStr) {
   return hora;
 }
 
-const AÑOS_RANGO = [2022, 2023, 2024, 2025];
-
 function calcularTodo(filas, año, gravedad, mes) {
-  // 1. Filtrar por año ('Todos' incluye 2022-2025)
+  // 1. Filtrar por año ('Todos' = todo el histórico disponible)
   let f = año === 'Todos'
-    ? filas.filter(r => AÑOS_RANGO.includes(Number(r.ANO_ACCIDENTE)))
+    ? filas.slice()
     : filas.filter(r => String(r.ANO_ACCIDENTE) === String(año));
   const gravedadCSV = GRAVEDAD_MAP[gravedad];
   if (gravedadCSV) f = f.filter(r => r.GRAVEDAD_ACCIDENTE === gravedadCSV);
@@ -49,8 +47,16 @@ function calcularTodo(filas, año, gravedad, mes) {
     return s + (parseInt(r['CANT_HERIDOS_EN _SITIO_ACCIDENTE']) || 0)
              + (parseInt(r['CANT_MUERTOS_EN _SITIO_ACCIDENTE']) || 0);
   }, 0);
-  // 'Todos' año + 'Todos' mes = 48 meses; año especifico = 12 meses; mes especifico = 1
-  const meses  = mes !== 'Todos' ? 1 : (año === 'Todos' ? 48 : 12);
+  // Divisor del promedio mensual: 1 si hay mes fijo; 12 para un año; y para
+  // 'Todos' los años, el número real de meses con datos en el rango histórico.
+  let meses;
+  if (mes !== 'Todos') {
+    meses = 1;
+  } else if (año !== 'Todos') {
+    meses = 12;
+  } else {
+    meses = new Set(f.map(r => `${r.ANO_ACCIDENTE}-${r.MES_ACCIDENTE}`)).size || 1;
+  }
   const promedio = Math.round(total / meses);
   // Tendencia: compara mismo mes del año anterior (o año completo si mes = 'Todos')
   let anterior = total; // default: sin cambio
