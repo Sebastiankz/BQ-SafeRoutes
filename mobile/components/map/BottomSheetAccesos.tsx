@@ -7,6 +7,7 @@ import type { SharedValue } from "react-native-reanimated";
 
 import { colors, iosTitleFont, radii, shadow } from "../../theme/tokens";
 import type { Reporte } from "../../services/reportes";
+import { useReverseGeocode } from "../../services/geocode";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -41,6 +42,17 @@ const MAX_REPORTES_LISTA = 12;
 
 function tituloTipo(tipo: string): string {
   return tipo.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+function ReporteRowSub({ item }: { item: Reporte }) {
+  const address = useReverseGeocode(item.latitud, item.longitud);
+  const fallback = `${item.latitud.toFixed(4)}, ${item.longitud.toFixed(4)}`;
+  const subtitle = item.descripcion ?? address ?? fallback;
+  return (
+    <Text numberOfLines={1} style={styles.filaSub}>
+      {subtitle}
+    </Text>
+  );
 }
 
 function BottomSheetAccesosBase(
@@ -160,11 +172,7 @@ function BottomSheetAccesosBase(
             <Text numberOfLines={1} style={styles.filaTitulo}>
               {tituloTipo(item.tipo)}
             </Text>
-            <Text numberOfLines={1} style={styles.filaSub}>
-              {item.descripcion
-                ? item.descripcion
-                : `${item.latitud.toFixed(4)}, ${item.longitud.toFixed(4)}`}
-            </Text>
+            <ReporteRowSub item={item} />
           </View>
           <View style={styles.severidad}>
             <View
