@@ -1,4 +1,4 @@
-const BASE = "https://maps.googleapis.com/maps/api";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "";
 
 export type LatLng = { latitude: number; longitude: number };
 
@@ -11,24 +11,18 @@ export type LugarSugerido = {
 
 export async function buscarLugares(
     query: string,
-    apiKey: string,
+    _apiKey: string,
     userLocation?: { latitude: number; longitude: number },
 ): Promise<LugarSugerido[]> {
     if (!query.trim()) return [];
-    let url =
-        `${BASE}/place/autocomplete/json` +
-        `?input=${encodeURIComponent(query)}` +
-        `&language=es` +
-        `&components=country:co` +
-        `&key=${apiKey}`;
 
+    const params = new URLSearchParams({ input: query });
     if (userLocation) {
-        url +=
-            `&location=${userLocation.latitude},${userLocation.longitude}` +
-            `&radius=15000`;
+        params.set("location", `${userLocation.latitude},${userLocation.longitude}`);
+        params.set("radius", "15000");
     }
 
-    const res = await fetch(url);
+    const res = await fetch(`${API_BASE}/geocode/places/autocomplete?${params}`);
     const json = await res.json();
     if (json.status !== "OK" && json.status !== "ZERO_RESULTS") {
         throw new Error(`Places Autocomplete: ${json.status}`);
@@ -49,14 +43,10 @@ export async function buscarLugares(
 
 export async function obtenerCoordenadasLugar(
     placeId: string,
-    apiKey: string,
+    _apiKey: string,
 ): Promise<LatLng> {
-    const url =
-        `${BASE}/place/details/json` +
-        `?place_id=${encodeURIComponent(placeId)}` +
-        `&fields=geometry` +
-        `&key=${apiKey}`;
-    const res = await fetch(url);
+    const params = new URLSearchParams({ place_id: placeId, fields: "geometry" });
+    const res = await fetch(`${API_BASE}/geocode/places/details?${params}`);
     const json = await res.json();
     if (json.status !== "OK") {
         throw new Error(`Place Details: ${json.status}`);
@@ -74,15 +64,13 @@ export type RutaResult = {
 export async function obtenerRuta(
     origen: LatLng,
     destino: LatLng,
-    apiKey: string,
+    _apiKey: string,
 ): Promise<RutaResult> {
-    const url =
-        `${BASE}/directions/json` +
-        `?origin=${origen.latitude},${origen.longitude}` +
-        `&destination=${destino.latitude},${destino.longitude}` +
-        `&language=es` +
-        `&key=${apiKey}`;
-    const res = await fetch(url);
+    const params = new URLSearchParams({
+        origin: `${origen.latitude},${origen.longitude}`,
+        destination: `${destino.latitude},${destino.longitude}`,
+    });
+    const res = await fetch(`${API_BASE}/geocode/directions?${params}`);
     const json = await res.json();
     if (json.status !== "OK") {
         throw new Error(`Directions: ${json.status}`);
